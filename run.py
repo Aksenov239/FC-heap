@@ -22,8 +22,8 @@ benchmarks=["fc.parallel.FCParallelHeap",
            "fc.sequential.FCBinaryHeap",
            "fc.sequential.FCPairingHeap"]
 
-if not os.path.isdir("out/w{}-d{}/".format(warmup, duration)):
-     os.makedirs("out/w{}-d{}/".format(warmup, duration))
+if not os.path.isdir("out/data/w{}-d{}/".format(warmup, duration)):
+     os.makedirs("out/data/w{}-d{}/".format(warmup, duration))
 
 for proc in procs:
     if proc > max_proc:
