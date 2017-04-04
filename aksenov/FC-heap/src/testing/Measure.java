@@ -28,9 +28,9 @@ public class Measure {
     }
 
     public void evaluateFor(int milliseconds, boolean withStats) {
-        long start = System.nanoTime();
-
         prepopulate();
+        
+        long start = System.nanoTime();
 
         Thread[] thrs = new Thread[threads];
         HeapWorker[] workers = new HeapWorker[threads];
