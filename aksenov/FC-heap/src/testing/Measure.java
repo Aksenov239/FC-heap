@@ -63,6 +63,11 @@ public class Measure {
 
         double totalTime = 1. * (System.nanoTime() - start) / 1_000_000_000;
 
+        if (!withStats) {
+            System.out.println("Total time spent:    \t" + totalTime);
+            return;
+        }
+
         int totalInserts = 0;
         int totalDeletes = 0;
         for (int i = 0; i < threads; i++) {
