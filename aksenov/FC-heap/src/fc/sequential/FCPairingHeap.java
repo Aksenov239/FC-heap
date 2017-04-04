@@ -4,13 +4,12 @@ import abstractions.Heap;
 import fc.FC;
 import fc.FCRequest;
 
-import java.util.Arrays;
-import java.util.PriorityQueue;
+import java.util.ArrayList;
 
 /**
  * Created by vaksenov on 24.03.2017.
  */
-public class FCBinaryHeap implements Heap {
+public class FCPairingHeap implements Heap {
     private FC fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
     private volatile boolean leaderExists;
@@ -70,56 +69,72 @@ public class FCBinaryHeap implements Heap {
     public class Node {
         volatile int v;
 
+        ArrayList<Node> children;
+
         public Node(int v) {
             this.v = v;
+            children = new ArrayList<>();
+        }
+
+        public String toString() {
+                StringBuilder sb = new StringBuilder();
+                sb.append("(" + v + ", [");
+                for (int i = 0; i < children.size(); i++) {
+                    if (i != 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(children.get(i));
+                }
+            sb.append("])");
+            return sb.toString();
         }
     }
 
-    private Node[] heap;
-    private int heapSize;
+    public Node merge(Node left, Node right) {
+        if (left == null) {
+            return right;
+        }
+        if (right == null) {
+            return left;
+        }
+        if (left.v < right.v) {
+            left.children.add(right);
+            return left;
+        } else {
+            right.children.add(left);
+            return right;
+        }
+    }
 
-    public FCBinaryHeap(int size, int numThreads) {
+    public Node mergePairs(ArrayList<Node> nodes, int start) {
+        if (start == nodes.size()) {
+            return null;
+        }
+        if (start + 1 == nodes.size()) {
+            return nodes.get(nodes.size() - 1);
+        }
+        return merge(merge(nodes.get(start), nodes.get(start + 1)), mergePairs(nodes, start + 1));
+    }
+
+    private Node heap;
+
+    public FCPairingHeap(int size, int numThreads) {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
-        heap = new Node[size];
+        heap = null;
         TRIES = numThreads;
         THRESHOLD = (int) Math.ceil(1. * numThreads / 1.7);
     }
 
     public void remove(Request request) {
-        request.v = heap[1].v;
+        request.v = heap.v;
         request.status = Status.FINISHED;
-        heap[1].v = heap[heapSize--].v;
-        int current = 1;
-        while (2 * current <= heapSize) { // While there exists at least one child in heap
-            int leftChild = 2 * current;
-            int rightChild = 2 * current + 1;
-            if (heap[current].v <= heap[leftChild].v
-                    && (rightChild > heapSize || heap[current].v <= heap[rightChild].v)) { // I'm better than children and could finish
-                return;
-            }
-            int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
-            int tmp = heap[current].v;
-            heap[current].v = heap[swap].v;
-            heap[swap].v = tmp;
-
-            current = swap;
-        }
+        heap = mergePairs(heap.children, 0);
     }
 
     public void sequentialInsert(int v) {
-        heap[++heapSize] = new Node(v);
-        int current = heapSize;
-        while (current > 1) {
-            if (heap[current].v < heap[current / 2].v) {
-                int q = heap[current].v;
-                heap[current].v = heap[current / 2].v;
-                heap[current / 2].v = q;
-                current /= 2;
-            } else {
-                break;
-            }
-        }
+        Node node = new Node(v);
+        heap = merge(node, heap);
     }
 
     public void insert(Request request) {
@@ -137,21 +152,13 @@ public class FCBinaryHeap implements Heap {
                 for (int t = 0; t < TRIES; t++) {
                     FCRequest[] requests = fc.loadRequests();
 
-                    if (heapSize + requests.length >= heap.length) { // Increase heap size
-                        Node[] newHeap = new Node[2 * heap.length];
-                        for (int i = 1; i <= heapSize; i++) {
-                            newHeap[i] = heap[i];
-                        }
-                        heap = newHeap;
-                    }
-
                     for (int i = 0; i < requests.length; i++) {
                         if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
                             remove(request);
                         } else {
                             insert(request);
                         }
-                        ((Request)requests[i]).status = Status.FINISHED;
+                        ((Request) requests[i]).status = Status.FINISHED;
                     }
 
                     fc.cleanup();
@@ -196,21 +203,10 @@ public class FCBinaryHeap implements Heap {
 
     public void clear() {
         fc = new FC();
-        for (int i = 0; i < heapSize; i++) {
-            heap[i + 1] = null;
-        }
-        heapSize = 0;
+        heap = null;
     }
 
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[");
-        for (int i = 1; i <= heapSize; i++) {
-            if (i != 1)
-                sb.append(", ");
-            sb.append("" + heap[i].v);
-        }
-        sb.append("]");
-        return sb.toString();
+        return heap == null ? "null" : heap.toString();
     }
 }
