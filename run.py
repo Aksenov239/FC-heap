@@ -31,7 +31,7 @@ for proc in procs:
     for size in sizes:
         for benchmark in benchmarks:
             out = filename(warmup, duration, proc, size, benchmark)
-            command = "java -server -cp {} {} -n {} -t {} -w {} -d {} -s {} -r {} -b {} > {}".format(classpath, mainclass, iterations, proc, warmup, duration, size, 2 * size, benchmark, out)
+            command = "java -server -Xmx1G -Xss256M -cp {} {} -n {} -t {} -w {} -d {} -s {} -r {} -b {} > {}".format(classpath, mainclass, iterations, proc, warmup, duration, size, 2 * size, benchmark, out)
             print(command)
             os.system(command)
 
