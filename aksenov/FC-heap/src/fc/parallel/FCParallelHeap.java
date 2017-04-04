@@ -12,7 +12,7 @@ import java.util.PriorityQueue;
 /**
  * Created by vaksenov on 24.03.2017.
  */
-public class FCHeap implements Heap {
+public class FCParallelHeap implements Heap {
     private FC fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
     private volatile boolean leaderExists;
@@ -274,11 +274,11 @@ public class FCHeap implements Heap {
     private Node[] heap;
     private int heapSize;
 
-    public FCHeap(int size, int numThreads) {
+    public FCParallelHeap(int size, int numThreads) {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
         heap = new Node[size];
-        TRIES = 3;
+        TRIES = numThreads;//3;
     }
 
     public void siftDown(Request request) {

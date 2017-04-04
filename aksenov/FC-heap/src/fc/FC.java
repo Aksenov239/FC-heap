@@ -36,6 +36,10 @@ public class FC {
         lock.set(0);
     }
 
+    public boolean isLocked() {
+        return lock.get() != 0;
+    }
+
     public void addRequest(FCRequest request) {
         if (request.next != null || !request.holdsRequest()) { // The request is not old yet
             return;
