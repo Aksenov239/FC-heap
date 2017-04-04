@@ -106,14 +106,18 @@ public class FCPairingHeap implements Heap {
         }
     }
 
-    public Node mergePairs(ArrayList<Node> nodes, int start) {
-        if (start == nodes.size()) {
-            return null;
+    public Node mergePairs(ArrayList<Node> nodes) {
+        int l = 0;
+        for (int i = 0; i < nodes.size(); i += 2) {
+            nodes.set(l++, merge(nodes.get(i), i < nodes.size() - 1 ? nodes.get(i + 1) : null));
         }
-        if (start + 1 == nodes.size()) {
-            return nodes.get(nodes.size() - 1);
+
+        Node ans = null;
+        for (int i = l - 1; i >= 0; i--) {
+            ans = merge(ans, nodes.get(i));
         }
-        return merge(merge(nodes.get(start), nodes.get(start + 1)), mergePairs(nodes, start + 1));
+
+        return ans;
     }
 
     private Node heap;
@@ -129,7 +133,7 @@ public class FCPairingHeap implements Heap {
     public void remove(Request request) {
         request.v = heap.v;
         request.status = Status.FINISHED;
-        heap = mergePairs(heap.children, 0);
+        heap = mergePairs(heap.children);
     }
 
     public void sequentialInsert(int v) {
