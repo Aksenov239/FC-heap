@@ -202,9 +202,10 @@ public class FCHeap implements Heap {
                 splitPosition = splitPosition.next;
             }
             InsertInfo insertInfo = new InsertInfo(null, 0, 0,
-                    splitPosition.next, tailFromHeap, listLength - (toLeft - (right - left)),
+                    splitPosition.next, tailFromHeap, toRight,
                     lrange, rrange, lneed, rneed);
             tailFromHeap = splitPosition;
+            listLength = toLeft - (right - left);
             return insertInfo;
         }
 
@@ -587,6 +588,7 @@ public class FCHeap implements Heap {
         for (int i = 0; i < heapSize; i++) {
             heap[i + 1] = null;
         }
+        heapSize = 0;
     }
 
     public String toString() {
