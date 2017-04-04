@@ -1,0 +1,603 @@
+package fc.parallel;
+
+import abstractions.Heap;
+import fc.FC;
+import fc.FCRequest;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.PriorityQueue;
+
+/**
+ * Created by vaksenov on 24.03.2017.
+ */
+public class FCHeap implements Heap {
+    private FC fc;
+    private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
+    private volatile boolean leaderExists;
+    private volatile boolean leaderInTransition;
+    private int TRIES;
+
+    public enum OperationType {
+        DELETE_MIN,
+        INSERT
+    }
+
+    public enum Status {
+        PUSHED,
+        SIFT_DELETE,
+        SIFT_INSERT,
+        FINISHED
+    }
+
+    public class Request extends FCRequest implements Comparable<Request> {
+        OperationType type;
+        volatile int v;
+
+        public Request() {
+            status = Status.PUSHED;
+        }
+
+        public void set(OperationType operationType) {
+            status = Status.PUSHED;
+            this.type = operationType;
+        }
+
+        public void set(OperationType operationType, int value) {
+            set(operationType);
+            this.v = value;
+        }
+
+        public int compareTo(Request request) {
+            return Integer.compare(v, request.v);
+        }
+
+        volatile Status status;
+        volatile boolean leader;
+
+        public boolean holdsRequest() {
+            return status != Status.FINISHED;
+        }
+
+        // Information for sift
+        volatile int siftStart; // start position of sift down for insert and delete
+
+        // Information for siftUp
+        // volatile int sizeOfList;
+        // volatile List headList;
+        // volatile List insertPosition;
+    }
+
+    private Request getLocalRequest() {
+        Request request = allocatedRequests.get();
+        if (request == null) {
+            request = new Request();
+            allocatedRequests.set(request);
+        }
+        return request;
+    }
+
+    public class List {
+        int value;
+        List next = null;
+
+        public List(int value) {
+            this.value = value;
+        }
+    }
+
+    public class InsertInfo {
+        List[] orderedValues;
+        int left, right; // Begin and end of captured positions in orderedValues
+        List headFromHeap;
+        List tailFromHeap;
+        int listLength;
+
+        int lrange, rrange; // current range of the info, excluding rrange
+
+        int lneed, rneed; // known range of inserted values, excluding rneed
+
+        public InsertInfo(List[] orderedValues, int left, int right,
+                          List headFromHeap, List tailFromHeap, int listLength,
+                          int lrange, int rrange, int lneed, int rneed) {
+            if (left < right) {
+                this.orderedValues = orderedValues;
+            }
+            this.left = left;
+            this.right = right;
+            this.headFromHeap = headFromHeap;
+            this.tailFromHeap = tailFromHeap;
+            this.listLength = listLength;
+
+            this.lrange = lrange;
+            this.rrange = rrange;
+            this.lneed = lneed;
+            this.rneed = rneed;
+        }
+
+        public int replaceMinFromHeap(int v) {
+            int bestOrdered = orderedValues != null ? orderedValues[left].value : Integer.MAX_VALUE;
+            int bestFromHeap = headFromHeap != null ? headFromHeap.value : Integer.MAX_VALUE;
+            if (Math.min(bestOrdered, bestFromHeap) >= v) { // The given value is the best
+                return v;
+            }
+            if (bestOrdered < bestFromHeap) { // The first ordered value should be in heap and we replace it
+                int res = orderedValues[left].value;
+                orderedValues[left].value = v;
+                if (headFromHeap != null) {
+                    tailFromHeap.next = orderedValues[left];
+                    tailFromHeap = tailFromHeap.next;
+                } else {
+                    headFromHeap = tailFromHeap = orderedValues[left];
+                }
+                left++;
+                if (left == right) {
+                    orderedValues = null;
+                }
+                listLength++;
+                return res;
+            } else { // The first values from heap should be now back and we replace it
+                int res = headFromHeap.value;
+                if (tailFromHeap != headFromHeap) {
+                    headFromHeap.value = v;
+                    tailFromHeap.next = headFromHeap;
+                    List tmp = headFromHeap.next;
+                    headFromHeap.next = null;
+                    headFromHeap = tmp;
+                } else {
+                    headFromHeap.value = v;
+                }
+                return res;
+            }
+        }
+
+        private int intersectionLeft() {
+            int l = lrange;
+            int r = (lrange + rrange) / 2;
+            if (Math.max(l, lneed) < Math.min(r, rneed)) { // Intersects
+                return Math.min(r, rneed) - Math.max(l, lneed);
+            }
+            if (2 * l < rneed) { //Probably, intersection is on next layer
+                if (l != r) { // are we on the last level
+                    l = 2 * l;
+                    r = 2 * r;
+                } else {
+                    l = 2 * l;
+                    r = 2 * r + 1;
+                }
+                if (Math.max(l, lneed) < Math.min(r, rneed)) {
+                    return Math.min(r, rneed) - Math.max(l, lneed);
+                }
+            }
+            return 0; // Do not intersect
+        }
+
+        public InsertInfo split() {
+            int toLeft = intersectionLeft();
+            if (right - left >= toLeft) { // We leave ourselves part of array
+                InsertInfo insertInfo = new InsertInfo(orderedValues, left + toLeft, right,
+                        headFromHeap, tailFromHeap, listLength,
+                        lrange, rrange, lneed, rneed);
+                right = left + toLeft;
+                headFromHeap = null;
+                tailFromHeap = null;
+                listLength = 0;
+                return insertInfo;
+            }
+            int toRight = right - left + listLength - toLeft;
+            if (right - left >= toRight) { // We give to new part of array
+                InsertInfo insertInfo = new InsertInfo(orderedValues, left, left + toRight,
+                        null, null, 0,
+                        lrange, rrange, lneed, rneed);
+                left = left + toRight;
+                if (left == right) {
+                    orderedValues = null;
+                }
+                return insertInfo;
+            }
+            // Split list
+            List splitPosition = headFromHeap;
+            for (int i = 0; i < toLeft - (right - left) - 1; i++) {
+                splitPosition = splitPosition.next;
+            }
+            InsertInfo insertInfo = new InsertInfo(null, 0, 0,
+                    splitPosition.next, tailFromHeap, listLength - (toLeft - (right - left)),
+                    lrange, rrange, lneed, rneed);
+            tailFromHeap = splitPosition;
+            return insertInfo;
+        }
+
+        public boolean goToLeft() {
+            return intersectionLeft() > 0;
+        }
+
+        public void slideToLeft() {
+            int l = lrange;
+            int r = rrange;
+            if (l == r - 1) {
+                lrange = 2 * l;
+                rrange = 2 * l + 1;
+            } else {
+                rrange = (l + r) / 2;
+            }
+
+        }
+
+        public void slideToRight() {
+            int l = lrange;
+            int r = rrange;
+            if (l == r - 1) {
+                lrange = 2 * l + 1;
+                rrange = 2 * l + 2;
+            } else {
+                lrange = (l + r) / 2;
+            }
+        }
+
+        public boolean finished() {
+            return lrange == rrange - 1 && lneed <= lrange && lrange < rneed;
+        }
+    }
+
+    public class Node {
+        volatile int v;
+
+        volatile boolean underProcessing;
+
+        volatile InsertInfo insertInfo; // Wake up thread to work on the right child
+
+        public Node(int v) {
+            this.v = v;
+        }
+    }
+
+    private Node[] heap;
+    private int heapSize;
+
+    public FCHeap(int size, int numThreads) {
+        fc = new FC();
+        size = Integer.highestOneBit(size) * 4;
+        heap = new Node[size];
+        TRIES = 3;
+    }
+
+    public void siftDown(Request request) {
+        int current = request.siftStart;
+        if (current == 0) {
+            request.status = Status.FINISHED;
+            return;
+        }
+        while (2 * current <= heapSize) { // While there exists at least one child in heap
+            int leftChild = 2 * current;
+            while (heap[leftChild].underProcessing) {
+            }
+            int rightChild = 2 * current + 1;
+            if (rightChild <= heapSize) {
+                while (heap[rightChild].underProcessing) {
+                }
+            }
+
+            if (heap[current].v <= heap[leftChild].v
+                    && (rightChild > heapSize || heap[current].v <= heap[rightChild].v)) { // I'm better than children and could finish
+                heap[current].underProcessing = false;
+                request.status = Status.FINISHED;
+                return;
+            }
+            int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
+            heap[swap].underProcessing = true;
+            int tmp = heap[current].v;
+            heap[current].v = heap[swap].v;
+            heap[swap].v = tmp;
+
+            heap[current].underProcessing = false;
+            current = swap;
+        }
+        heap[current].underProcessing = false;
+        request.status = Status.FINISHED;
+    }
+
+    public void insert(Request request) {
+        int current = request.siftStart;
+//        System.err.println("Wait on: " + current);
+        while (heap[current].insertInfo == null) {
+        } // Wait for someone to wake up us
+
+        InsertInfo insertInfo = heap[current].insertInfo;
+        heap[current].insertInfo = null;
+        while (!insertInfo.finished()) {
+//            System.err.println(current + " " + insertInfo.lrange + " " + insertInfo.rrange + " " + insertInfo.lneed + " " + insertInfo.rneed);
+            heap[current].v = insertInfo.replaceMinFromHeap(heap[current].v); // Replace current value
+            if (heap[current].underProcessing) { // Then I should split the work and give the right child new info
+//                System.err.println("Split on " + current);
+                heap[current].underProcessing = false;
+                InsertInfo toRight = insertInfo.split();
+                toRight.slideToRight();
+                heap[2 * current + 1].insertInfo = toRight; // Give info to the right child
+
+                insertInfo.slideToLeft();
+                current = 2 * current;
+            } else {
+//                System.err.println("Slide: " + current + " " + insertInfo.goToLeft());
+                if (insertInfo.goToLeft()) {
+                    insertInfo.slideToLeft();
+                    current = 2 * current;
+                } else {
+                    insertInfo.slideToRight();
+                    current = 2 * current + 1;
+                }
+            }
+//            System.err.println("Current: " + current);
+        }
+        assert insertInfo.lneed <= current && current < insertInfo.rneed;
+        heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
+        request.status = Status.FINISHED;
+    }
+
+    volatile FCRequest[] loadedRequests;
+
+    public void handleRequest(Request request) {
+        fc.addRequest(request);
+        while (request.leader || request.holdsRequest()) {
+            if (!leaderExists) {
+                if (fc.tryLock()) {
+                    leaderExists = true;
+                    request.leader = true;
+                }
+            }
+
+            if (request.leader && !leaderInTransition &&
+                    (request.status == Status.PUSHED || request.status == Status.FINISHED)) { // I'm the leader
+                fc.addRequest(request);
+
+                for (int t = 0; t < TRIES; t++) {
+                    FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
+
+                    if (requests.length == 0) {
+                        fc.cleanup();
+                        break;
+                    }
+
+                    if (request.status == Status.FINISHED) {
+                        request.leader = false;
+                        int search = 0;
+
+                        for (int i = 0; i < requests.length; i++) {
+                            if (((Request) requests[i]).type == OperationType.INSERT) {
+                                search = i;
+                                break;
+                            }
+                        }
+                        ((Request) requests[search]).leader = true;
+                        loadedRequests = requests;
+                        return;
+                    }
+                    loadedRequests = null;
+
+                    int deleteSize = 0;
+                    for (int i = 0; i < requests.length; i++) {
+                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+                    }
+
+                    Request[] deleteRequests = new Request[deleteSize];
+                    Request[] insertRequests = new Request[requests.length - deleteSize];
+                    deleteSize = 0;
+                    for (int i = 0; i < requests.length; i++) {
+                        if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
+                            deleteRequests[deleteSize++] = (Request) requests[i];
+                        } else {
+                            insertRequests[i - deleteSize] = (Request) requests[i];
+                        }
+                    }
+
+                    if (heapSize + insertRequests.length >= heap.length) { // Increase heap size
+                        Node[] newHeap = new Node[2 * heap.length];
+                        for (int i = 1; i <= heapSize; i++) {
+                            newHeap[i] = heap[i];
+                        }
+                        heap = newHeap;
+                    }
+
+                    if (insertRequests.length > 0) {
+                        Arrays.sort(insertRequests);
+                    }
+
+                    int insertStart = 0;
+
+                    if (deleteRequests.length > 0) { // Prepare for delete minimums
+                        PriorityQueue<Integer> pq = new PriorityQueue<>((l, r) -> {
+                            return Integer.compare(heap[l].v, heap[r].v);
+                        });
+                        // Looking for elements to remove
+                        int[] kbest = new int[deleteRequests.length];
+                        pq.add(1); // The root should be removed
+                        for (int i = 0; i < deleteRequests.length; i++) {
+                            int node = pq.poll();
+                            kbest[i] = node;
+                            heap[node].underProcessing = true;
+                            deleteRequests[i].siftStart = 0; // initialize start position of sift
+
+                            if (2 * node <= heapSize) {
+                                pq.add(2 * node);
+                            }
+                            if (2 * node + 1 <= heapSize) {
+                                pq.add(2 * node + 1);
+                            }
+                        }
+                        Arrays.sort(kbest);
+                        for (int i = 0; i < deleteRequests.length; i++) {
+                            int node = kbest[i];
+                            deleteRequests[i].v = heap[node].v;
+
+                            if (node >= heapSize - 1) { // We are the last or way later, then do nothing
+                                if (node != heapSize - 1) {
+                                    heap[node].underProcessing = false;
+                                    continue;
+                                } else if (i >= insertRequests.length) { // We are last and there is no inserts left
+                                    heap[node].underProcessing = false;
+                                    heapSize--;
+                                    continue;
+                                }
+                            }
+
+                            if (insertStart < insertRequests.length) { // We could add insert some values right now
+                                heap[node].v = insertRequests[insertStart].v;
+                                insertRequests[insertStart++].status = Status.FINISHED;
+                            } else {
+                                while (heap[heapSize].underProcessing) { // We should swap only with unprocessed vertices
+                                    heapSize--;
+                                }
+                                if (node >= heapSize - 1) { // If we again are last or already out then do nothing
+                                    if (node == heapSize - 1) {
+                                        heapSize--;
+                                    }
+                                    heap[node].underProcessing = false;
+                                    continue;
+                                }
+                                heap[node].v = heap[heapSize--].v;
+                                heap[heapSize + 1] = null;
+                            }
+                            deleteRequests[i].siftStart = node;
+                        }
+                        for (int i = 0; i < deleteRequests.length; i++) {
+                            deleteRequests[i].status = Status.SIFT_DELETE;
+                        }
+                        if (request.status == Status.SIFT_DELETE) { // I have to delete too
+                            siftDown(request);
+                        }
+                        for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
+                            while (deleteRequests[i].status != Status.FINISHED
+                                    && deleteRequests[i].status != Status.PUSHED) {
+                            }
+                        }
+                    }
+
+                    if (insertStart < insertRequests.length) { // There are insert requests left
+                        // give the work to thread from root
+                        insertRequests[insertStart].siftStart = 1;
+
+                        List[] orderedValues = new List[insertRequests.length - insertStart];
+                        for (int i = 0; i < orderedValues.length; i++) {
+                            orderedValues[i] = new List(insertRequests[i + insertStart].v);
+                            heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE);
+                        }
+
+                        int lstart = Integer.highestOneBit(heapSize + 1);
+                        heap[1].insertInfo = new InsertInfo(orderedValues, 0, orderedValues.length,
+                                null, null, 0,
+                                lstart, 2 * lstart, heapSize + 1, heapSize + orderedValues.length + 1);
+
+                        int id = 0;
+                        for (int i = 1; i < orderedValues.length; i++) {
+                            int left = i + heapSize;
+                            int right = i + 1 + heapSize;
+                            int lca = 0;
+                            if (right == Integer.lowestOneBit(right)) { // We go to the next row
+                                lca = 1;
+                            } else {
+                                lca = ~(left ^ right); // lca of i-th and (i-1)-th
+                                lca = (i + heapSize) / Integer.lowestOneBit(lca);
+                            }
+
+//                            System.err.println("LCA: " + lca + " " + left + " " + right);
+
+                            heap[lca].underProcessing = true;
+                            insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
+                        }
+
+                        for (int i = insertStart; i < insertRequests.length; i++) {
+                            insertRequests[i].status = Status.SIFT_INSERT;
+                        }
+
+                        heapSize = heapSize + orderedValues.length;
+
+                        if (request.status == Status.SIFT_INSERT) {
+                            insert(request);
+                        }
+                        for (int i = insertStart; i < insertRequests.length; i++) {
+                            while (insertRequests[i].status != Status.FINISHED &&
+                                    insertRequests[i].status != Status.PUSHED) {
+                            } // wait while finish
+                        }
+                    }
+
+                    fc.cleanup();
+//                    if (!request.leader) {
+//                        leaderInTransition = false;
+//                        return;
+//                    }
+                }
+
+//                leaderInTransition = false;
+                request.leader = false;
+                leaderExists = false;
+                fc.unlock();
+            } else {
+                while (request.status == Status.PUSHED && !request.leader) {
+                    fc.addRequest(request);
+                }
+                if (request.leader) { // Someone set me as a leader
+                    continue;
+                }
+                if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
+                    siftDown(request);
+                } else if (request.status == Status.SIFT_INSERT) { // I should make a sift up
+                    insert(request);
+                }
+                if (!request.leader) {
+
+                    return;
+                }
+            }
+        }
+    }
+
+    public int deleteMin() {
+//        System.err.println("Delete min");
+        Request request = getLocalRequest();
+        request.set(OperationType.DELETE_MIN, -1); // I assume that the insert value for delete min is -1
+        handleRequest(request);
+        return request.v;
+    }
+
+    public void insert(int v) {
+//        System.err.println("Insert " + v);
+        Request request = getLocalRequest();
+        request.set(OperationType.INSERT, v); // I assume that the inserted values are >= 0
+        handleRequest(request);
+    }
+
+    public void sequentialInsert(int v) {
+        heap[++heapSize] = new Node(v);
+        int current = heapSize;
+        while (current > 1) {
+            if (heap[current].v < heap[current / 2].v) {
+                int q = heap[current].v;
+                heap[current].v = heap[current / 2].v;
+                heap[current / 2].v = q;
+                current /= 2;
+            } else {
+                break;
+            }
+        }
+    }
+
+    public void clear() {
+        fc = new FC();
+        for (int i = 0; i < heapSize; i++) {
+            heap[i + 1] = null;
+        }
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        for (int i = 1; i <= heapSize; i++) {
+            if (i != 1)
+                sb.append(", ");
+            sb.append("" + heap[i].v);
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+}
