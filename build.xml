@@ -1,5 +1,5 @@
 <project default="compile">
     <target name="compile">
         <mkdir dir="bin"/>
-        <javac srcdir="src" destdir="bin"/>
+        <javac srcdir="src" destdir="bin" debug="true" />
     </target></project>
