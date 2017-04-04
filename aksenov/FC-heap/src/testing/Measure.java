@@ -29,8 +29,6 @@ public class Measure {
 
     public void evaluateFor(int milliseconds, boolean withStats) {
         prepopulate();
-        
-        long start = System.nanoTime();
 
         Thread[] thrs = new Thread[threads];
         HeapWorker[] workers = new HeapWorker[threads];
@@ -38,6 +36,8 @@ public class Measure {
             workers[i] = new HeapWorker(i, heap, range, insertRatio);
             thrs[i] = new Thread(workers[i]);
         }
+
+        long start = System.nanoTime();
 
         for (int i = 0; i < threads; i++) {
             thrs[i].start();
