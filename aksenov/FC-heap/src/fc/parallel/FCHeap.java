@@ -85,6 +85,16 @@ public class FCHeap implements Heap {
         public List(int value) {
             this.value = value;
         }
+
+        public int length() {
+          int size = 0;
+          List now = this;
+          while (now != null) {
+            size++;
+            now = now.next;
+          }
+          return size;
+        }
     }
 
     public class InsertInfo {
@@ -136,18 +146,22 @@ public class FCHeap implements Heap {
                     orderedValues = null;
                 }
                 listLength++;
+                assert headFromHeap.length() == listLength;
                 return res;
             } else { // The first values from heap should be now back and we replace it
                 int res = headFromHeap.value;
+                assert headFromHeap.length() == listLength;
                 if (tailFromHeap != headFromHeap) {
                     headFromHeap.value = v;
                     tailFromHeap.next = headFromHeap;
                     List tmp = headFromHeap.next;
                     headFromHeap.next = null;
+                    tailFromHeap = headFromHeap;
                     headFromHeap = tmp;
                 } else {
                     headFromHeap.value = v;
                 }
+                assert headFromHeap.length() == listLength;
                 return res;
             }
         }
@@ -175,6 +189,7 @@ public class FCHeap implements Heap {
 
         public InsertInfo split() {
             int toLeft = intersectionLeft();
+            assert toLeft < right - left + listLength;
             if (right - left >= toLeft) { // We leave ourselves part of array
                 InsertInfo insertInfo = new InsertInfo(orderedValues, left + toLeft, right,
                         headFromHeap, tailFromHeap, listLength,
@@ -205,7 +220,10 @@ public class FCHeap implements Heap {
                     splitPosition.next, tailFromHeap, toRight,
                     lrange, rrange, lneed, rneed);
             tailFromHeap = splitPosition;
+            splitPosition.next = null;
             listLength = toLeft - (right - left);
+            assert headFromHeap.length() == listLength;
+            assert insertInfo.headFromHeap.length() == toRight;
             return insertInfo;
         }
 
@@ -571,6 +589,7 @@ public class FCHeap implements Heap {
     public void sequentialInsert(int v) {
         heap[++heapSize] = new Node(v);
         int current = heapSize;
+//        System.out.println(current);
         while (current > 1) {
             if (heap[current].v < heap[current / 2].v) {
                 int q = heap[current].v;
