@@ -61,7 +61,7 @@ public class Measure {
             }
         }
 
-        long totalTime = (System.nanoTime() - start) / 1_000_000_000;
+        double totalTime = 1. * (System.nanoTime() - start) / 1_000_000_000;
 
         int totalInserts = 0;
         int totalDeletes = 0;
