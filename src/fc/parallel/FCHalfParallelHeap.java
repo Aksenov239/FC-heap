@@ -72,25 +72,6 @@ public class FCHalfParallelHeap implements Heap {
         return request;
     }
 
-    public class List {
-        int value;
-        List next = null;
-
-        public List(int value) {
-            this.value = value;
-        }
-
-        public int length() {
-            int size = 0;
-            List now = this;
-            while (now != null) {
-                size++;
-                now = now.next;
-            }
-            return size;
-        }
-    }
-
     public class Node {
         volatile int v;
 
@@ -289,15 +270,14 @@ public class FCHalfParallelHeap implements Heap {
                             siftDown(request);
                         }
                         for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
-                            while (deleteRequests[i].status != Status.SIFT_DELETE) {
+                            while (deleteRequests[i].status == Status.SIFT_DELETE) {
 //                                sleep();
                             }
                         }
                     }
 
                     if (insertStart < insertRequests.length) { // There are insert requests left
-                        List[] orderedValues = new List[insertRequests.length - insertStart];
-                        for (int i = 0; i < orderedValues.length; i++) {
+                        for (int i = 0; i < insertRequests.length - insertStart; i++) {
                             insert(insertRequests[i + insertStart]);
                         }
                     }
