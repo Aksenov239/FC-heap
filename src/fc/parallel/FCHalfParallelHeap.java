@@ -31,7 +31,7 @@ public class FCHalfParallelHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        OperationType type;
+        volatile OperationType type;
         volatile int v;
 
         public Request() {
@@ -289,8 +289,7 @@ public class FCHalfParallelHeap implements Heap {
                             siftDown(request);
                         }
                         for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
-                            while (deleteRequests[i].status != Status.FINISHED
-                                    && deleteRequests[i].status != Status.PUSHED) {
+                            while (deleteRequests[i].status != Status.SIFT_DELETE) {
 //                                sleep();
                             }
                         }

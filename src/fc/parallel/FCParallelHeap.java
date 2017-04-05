@@ -33,7 +33,7 @@ public class FCParallelHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        OperationType type;
+        volatile OperationType type;
         volatile int v;
 
         public Request() {
@@ -80,8 +80,8 @@ public class FCParallelHeap implements Heap {
     }
 
     public class List {
-        int value;
-        List next = null;
+        volatile int value;
+        volatile List next = null;
 
         public List(int value) {
             this.value = value;
@@ -405,6 +405,7 @@ public class FCParallelHeap implements Heap {
 
                     int deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
+//                        assert requests[i].holdsRequest();
                         deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
                     }
 
@@ -412,6 +413,7 @@ public class FCParallelHeap implements Heap {
                     Request[] insertRequests = new Request[requests.length - deleteSize];
                     deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
+//                        assert requests[i].holdsRequest();
                         if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
                             deleteRequests[deleteSize++] = (Request) requests[i];
                         } else {

@@ -28,7 +28,7 @@ public class FCPairingHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        OperationType type;
+        volatile OperationType type;
         volatile int v;
 
         public Request() {
