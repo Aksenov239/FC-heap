@@ -495,8 +495,7 @@ public class FCParallelHeap implements Heap {
                             siftDown(request);
                         }
                         for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
-                            while (deleteRequests[i].status != Status.FINISHED
-                                    && deleteRequests[i].status != Status.PUSHED) {
+                            while (deleteRequests[i].status == Status.SIFT_DELETE) {
 //                                sleep();
                             }
                         }
@@ -545,8 +544,7 @@ public class FCParallelHeap implements Heap {
                             insert(request);
                         }
                         for (int i = insertStart; i < insertRequests.length; i++) {
-                            while (insertRequests[i].status != Status.FINISHED &&
-                                    insertRequests[i].status != Status.PUSHED) {
+                            while (insertRequests[i].status == Status.SIFT_INSERT) {
 //                                sleep();
                             } // wait while finish
                         }
