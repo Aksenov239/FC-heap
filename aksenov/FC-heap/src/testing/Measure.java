@@ -136,7 +136,7 @@ public class Measure {
                 } else if (parameter.equals("-b")) {
                     benchClassname = option;
                 } else if (parameter.equals("-n")) {
-                    benchClassname = option;
+                    iterations = Integer.parseInt(option);
                 }
             } catch (IndexOutOfBoundsException e) {
                 System.err.println("Missing value after option " + parameter + ". Ignoring.");
