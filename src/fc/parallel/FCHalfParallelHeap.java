@@ -45,7 +45,7 @@ public class FCHalfParallelHeap implements Heap {
 
         public void set(OperationType operationType, int value) {
             this.v = value;
-            set(operation```ype);
+            set(operationType);
         }
 
         public int compareTo(Request request) {
