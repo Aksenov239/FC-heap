@@ -39,13 +39,13 @@ public class FCHalfParallelHeap implements Heap {
         }
 
         public void set(OperationType operationType) {
-            status = Status.PUSHED;
             this.type = operationType;
+            status = Status.PUSHED;
         }
 
         public void set(OperationType operationType, int value) {
-            set(operationType);
             this.v = value;
+            set(operationType);
         }
 
         public int compareTo(Request request) {
@@ -176,8 +176,8 @@ public class FCHalfParallelHeap implements Heap {
                                 break;
                             }
                         }
-                        ((Request) requests[search]).leader = true;
                         loadedRequests = requests;
+                        ((Request) requests[search]).leader = true;
                         return;
                     }
                     loadedRequests = null;
