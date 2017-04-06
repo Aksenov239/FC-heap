@@ -41,13 +41,13 @@ public class FCParallelHeap implements Heap {
         }
 
         public void set(OperationType operationType) {
-            status = Status.PUSHED;
             this.type = operationType;
+            status = Status.PUSHED;
         }
 
         public void set(OperationType operationType, int value) {
-            set(operationType);
             this.v = value;
+            set(operationType);
         }
 
         public int compareTo(Request request) {
@@ -397,20 +397,26 @@ public class FCParallelHeap implements Heap {
                                 break;
                             }
                         }
-                        ((Request) requests[search]).leader = true;
                         loadedRequests = requests;
+                        ((Request) requests[search]).leader = true;
                         return;
                     }
                     loadedRequests = null;
 
                     int deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
-//                        assert requests[i].holdsRequest();
+                        assert ((Request) requests[i]).status == Status.PUSHED ;
                         deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
                     }
 
                     Request[] deleteRequests = new Request[deleteSize];
                     Request[] insertRequests = new Request[requests.length - deleteSize];
+                    deleteSize = 0;
+                    for (int i = 0; i < requests.length; i++) {
+                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+                    }
+                    assert deleteSize == deleteRequests.length;
+
                     deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
 //                        assert requests[i].holdsRequest();
