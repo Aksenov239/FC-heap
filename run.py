@@ -24,7 +24,7 @@ benchmarks=["fc.parallel.FCParallelHeap",
            "fc.parallel.FCHalfParallelHeap",
            "fc.sequential.FCBinaryHeap",
            "fc.sequential.FCPairingHeap",
-           "lockbased.BLockingHeap",
+           "lockbased.BlockingHeap",
            "lockbased.LazySkipListHeap"]
 
 if not os.path.isdir("out/log/w{}-d{}/".format(warmup, duration)):
