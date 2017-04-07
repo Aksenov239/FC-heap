@@ -89,6 +89,9 @@ public class FCHalfParallelHeap implements Heap {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
         heap = new Node[size];
+        for (int i = 0; i < heap.length; i++) {
+            heap[i] = new Node(Integer.MAX_VALUE);
+        }
         TRIES = numThreads;//3;
         THRESHOLD = (int) (Math.ceil(numThreads / 1.7));
     }
@@ -99,11 +102,12 @@ public class FCHalfParallelHeap implements Heap {
             request.status = Status.FINISHED;
             return;
         }
-        while (2 * current <= heapSize) { // While there exists at least one child in heap
-            int leftChild = 2 * current;
+        int to = heapSize >> 1;
+        while (current <= to) { // While there exists at least one child in heap
+            int leftChild = current << 1;
             while (heap[leftChild].underProcessing) {
             }
-            int rightChild = 2 * current + 1;
+            int rightChild = leftChild + 1;
             if (rightChild <= heapSize) {
                 while (heap[rightChild].underProcessing) {
                 }
@@ -203,6 +207,9 @@ public class FCHalfParallelHeap implements Heap {
                         for (int i = 1; i <= heapSize; i++) {
                             newHeap[i] = heap[i];
                         }
+                        for (int i = heapSize + 1; i < newHeap.length; i++) {
+                            newHeap[i] = new Node(Integer.MAX_VALUE);
+                        }
                         heap = newHeap;
                     }
 
@@ -259,7 +266,7 @@ public class FCHalfParallelHeap implements Heap {
                                     continue;
                                 }
                                 heap[node].v = heap[heapSize--].v;
-                                heap[heapSize + 1] = null;
+                                heap[heapSize + 1].v = Integer.MAX_VALUE;
                             }
                             deleteRequests[i].siftStart = node;
                         }
@@ -332,15 +339,15 @@ public class FCHalfParallelHeap implements Heap {
     }
 
     public void sequentialInsert(int v) {
-        heap[++heapSize] = new Node(v);
+        heap[++heapSize].v = v;
         int current = heapSize;
 //        System.out.println(current);
         while (current > 1) {
-            if (heap[current].v < heap[current / 2].v) {
+            if (heap[current].v < heap[current >> 1].v) {
                 int q = heap[current].v;
-                heap[current].v = heap[current / 2].v;
-                heap[current / 2].v = q;
-                current /= 2;
+                heap[current].v = heap[current >> 1].v;
+                heap[current >> 1].v = q;
+                current >>= 1;
             } else {
                 break;
             }
@@ -350,7 +357,7 @@ public class FCHalfParallelHeap implements Heap {
     public void clear() {
         fc = new FC();
         for (int i = 0; i < heapSize; i++) {
-            heap[i + 1] = null;
+            heap[i + 1].v = Integer.MAX_VALUE;
         }
         heapSize = 0;
     }

@@ -37,13 +37,13 @@ public class FCBinaryHeap implements Heap {
         }
 
         public void set(OperationType operationType) {
-            status = Status.PUSHED;
             this.type = operationType;
+            status = Status.PUSHED;
         }
 
         public void set(OperationType operationType, int value) {
-            set(operationType);
             this.v = value;
+            set(operationType);
         }
 
         public int compareTo(Request request) {
@@ -67,55 +67,48 @@ public class FCBinaryHeap implements Heap {
         return request;
     }
 
-    public class Node {
-        volatile int v;
-
-        public Node(int v) {
-            this.v = v;
-        }
-    }
-
-    private Node[] heap;
+    private int[] heap;
     private int heapSize;
 
     public FCBinaryHeap(int size, int numThreads) {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
-        heap = new Node[size];
+        heap = new int[size];
         TRIES = numThreads;
         THRESHOLD = (int) Math.ceil(1. * numThreads / 1.7);
     }
 
     public void remove(Request request) {
-        request.v = heap[1].v;
+        request.v = heap[1];
         request.status = Status.FINISHED;
-        heap[1].v = heap[heapSize--].v;
+        heap[1] = heap[heapSize--];
         int current = 1;
-        while (2 * current <= heapSize) { // While there exists at least one child in heap
-            int leftChild = 2 * current;
-            int rightChild = 2 * current + 1;
-            if (heap[current].v <= heap[leftChild].v
-                    && (rightChild > heapSize || heap[current].v <= heap[rightChild].v)) { // I'm better than children and could finish
+        int to = heapSize >> 1;
+        while (current <= to) { // While there exists at least one child in heap
+            int leftChild = current << 1;
+            int rightChild = leftChild + 1;
+            if (heap[current] <= heap[leftChild]
+                    && (rightChild > heapSize || heap[current] <= heap[rightChild])) { // I'm better than children and could finish
                 return;
             }
-            int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
-            int tmp = heap[current].v;
-            heap[current].v = heap[swap].v;
-            heap[swap].v = tmp;
+            int swap = rightChild > heapSize || heap[leftChild] < heap[rightChild] ? leftChild : rightChild; // With whom to swap
+            int tmp = heap[current];
+            heap[current] = heap[swap];
+            heap[swap] = tmp;
 
             current = swap;
         }
     }
 
     public void sequentialInsert(int v) {
-        heap[++heapSize] = new Node(v);
+        heap[++heapSize] = v;
         int current = heapSize;
         while (current > 1) {
-            if (heap[current].v < heap[current / 2].v) {
-                int q = heap[current].v;
-                heap[current].v = heap[current / 2].v;
-                heap[current / 2].v = q;
-                current /= 2;
+            if (heap[current] < heap[current >> 1]) {
+                int q = heap[current];
+                heap[current] = heap[current >> 1];
+                heap[current >> 1] = q;
+                current >>= 2;
             } else {
                 break;
             }
@@ -138,7 +131,7 @@ public class FCBinaryHeap implements Heap {
                     FCRequest[] requests = fc.loadRequests();
 
                     if (heapSize + requests.length >= heap.length) { // Increase heap size
-                        Node[] newHeap = new Node[2 * heap.length];
+                        int[] newHeap = new int[2 * heap.length];
                         for (int i = 1; i <= heapSize; i++) {
                             newHeap[i] = heap[i];
                         }
@@ -197,7 +190,7 @@ public class FCBinaryHeap implements Heap {
     public void clear() {
         fc = new FC();
         for (int i = 0; i < heapSize; i++) {
-            heap[i + 1] = null;
+            heap[i + 1] = 0;
         }
         heapSize = 0;
     }
@@ -208,7 +201,7 @@ public class FCBinaryHeap implements Heap {
         for (int i = 1; i <= heapSize; i++) {
             if (i != 1)
                 sb.append(", ");
-            sb.append("" + heap[i].v);
+            sb.append("" + heap[i]);
         }
         sb.append("]");
         return sb.toString();
