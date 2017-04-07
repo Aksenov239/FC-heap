@@ -169,17 +169,17 @@ public class FCParallelHeap implements Heap {
 
         private int intersectionLeft() {
             int l = lrange;
-            int r = (lrange + rrange) / 2;
+            int r = (lrange + rrange) >> 1;
             if (Math.max(l, lneed) < Math.min(r, rneed)) { // Intersects
                 return Math.min(r, rneed) - Math.max(l, lneed);
             }
             if (2 * l < rneed) { //Probably, intersection is on next layer
                 if (l != r) { // are we on the last level
-                    l = 2 * l;
-                    r = 2 * r;
+                    l = l << 1;
+                    r = r << 1;
                 } else {
-                    l = 2 * l;
-                    r = 2 * r + 1;
+                    l = l << 1;
+                    r = (r << 1) + 1;
                 }
                 if (Math.max(l, lneed) < Math.min(r, rneed)) {
                     return Math.min(r, rneed) - Math.max(l, lneed);
@@ -236,10 +236,10 @@ public class FCParallelHeap implements Heap {
             int l = lrange;
             int r = rrange;
             if (l == r - 1) {
-                lrange = 2 * l;
-                rrange = 2 * l + 1;
+                lrange = l << 1;
+                rrange = lrange + 1;
             } else {
-                rrange = (l + r) / 2;
+                rrange = (l + r) >> 1;
             }
 
         }
@@ -248,10 +248,10 @@ public class FCParallelHeap implements Heap {
             int l = lrange;
             int r = rrange;
             if (l == r - 1) {
-                lrange = 2 * l + 1;
-                rrange = 2 * l + 2;
+                lrange = (l << 1) + 1;
+                rrange = lrange + 1;
             } else {
-                lrange = (l + r) / 2;
+                lrange = (l + r) >> 1;
             }
         }
 
@@ -279,6 +279,9 @@ public class FCParallelHeap implements Heap {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
         heap = new Node[size];
+        for (int i = 0; i < heap.length; i++) {
+            heap[i] = new Node(Integer.MAX_VALUE);
+        }
         TRIES = numThreads;//3;
         THRESHOLD = (int) (Math.ceil(numThreads / 1.7));
     }
@@ -289,11 +292,12 @@ public class FCParallelHeap implements Heap {
             request.status = Status.FINISHED;
             return;
         }
-        while (2 * current <= heapSize) { // While there exists at least one child in heap
-            int leftChild = 2 * current;
+        int to = heapSize >> 1;
+        while (current <= to) { // While there exists at least one child in heap
+            int leftChild = current << 1;
             while (heap[leftChild].underProcessing) {
             }
-            int rightChild = 2 * current + 1;
+            int rightChild = leftChild + 1;
             if (rightChild <= heapSize) {
                 while (heap[rightChild].underProcessing) {
                 }
@@ -334,18 +338,18 @@ public class FCParallelHeap implements Heap {
                 heap[current].underProcessing = false;
                 InsertInfo toRight = insertInfo.split();
                 toRight.slideToRight();
-                heap[2 * current + 1].insertInfo = toRight; // Give info to the right child
+                heap[(current << 1) + 1].insertInfo = toRight; // Give info to the right child
 
                 insertInfo.slideToLeft();
-                current = 2 * current;
+                current = current << 1;
             } else {
 //                System.err.println("Slide: " + current + " " + insertInfo.goToLeft());
                 if (insertInfo.goToLeft()) {
                     insertInfo.slideToLeft();
-                    current = 2 * current;
+                    current = current << 1;
                 } else {
                     insertInfo.slideToRight();
-                    current = 2 * current + 1;
+                    current = (current << 1) + 1;
                 }
             }
 //            System.err.println("Current: " + current);
@@ -432,6 +436,9 @@ public class FCParallelHeap implements Heap {
                         for (int i = 1; i <= heapSize; i++) {
                             newHeap[i] = heap[i];
                         }
+                        for (int i = heapSize + 1; i < newHeap.length; i++) {
+                            newHeap[i] = new Node(Integer.MAX_VALUE);
+                        }
                         heap = newHeap;
                     }
 
@@ -492,7 +499,7 @@ public class FCParallelHeap implements Heap {
                                     continue;
                                 }
                                 heap[node].v = heap[heapSize--].v;
-                                heap[heapSize + 1] = null;
+                                heap[heapSize + 1].v = Integer.MAX_VALUE; // remove value
                             }
                             deleteRequests[i].siftStart = node;
                         }
@@ -516,7 +523,7 @@ public class FCParallelHeap implements Heap {
                         List[] orderedValues = new List[insertRequests.length - insertStart];
                         for (int i = 0; i < orderedValues.length; i++) {
                             orderedValues[i] = new List(insertRequests[i + insertStart].v);
-                            heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE);
+//                            heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE); // already in the tree
                         }
 
                         int lstart = Integer.highestOneBit(heapSize + 1);
@@ -608,7 +615,7 @@ public class FCParallelHeap implements Heap {
     }
 
     public void sequentialInsert(int v) {
-        heap[++heapSize] = new Node(v);
+        heap[++heapSize].v = v;
         int current = heapSize;
 //        System.out.println(current);
         while (current > 1) {
@@ -626,7 +633,7 @@ public class FCParallelHeap implements Heap {
     public void clear() {
         fc = new FC();
         for (int i = 0; i < heapSize; i++) {
-            heap[i + 1] = null;
+            heap[i + 1].v = Integer.MAX_VALUE;
         }
         heapSize = 0;
     }
