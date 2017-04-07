@@ -37,9 +37,9 @@ benchmarks=["fc.parallel.FCParallelHeap",
            "lockbased.BlockingHeap",
            "lockbased.LazySkipListHeap"]
 
-directory = "out/data/w{}-d{}/".format(warmip, duration)
+directory = "out/data/w{}-d{}/".format(warmup, duration)
 if not os.path.isdir(directory):
-    os.mkdir(directory)
+    os.makedirs(directory)
 
 for key in keys:
     for size in sizes:
