@@ -61,7 +61,7 @@ public class FCParallelHeap implements Heap {
         }
 
         // Information for sift
-        volatile int siftStart; // start position of sift down for insert and delete
+        int siftStart; // start position of sift down for insert and delete
 
         // Information for siftUp
         // volatile int sizeOfList;
@@ -260,7 +260,7 @@ public class FCParallelHeap implements Heap {
     }
 
     public class Node {
-        volatile int v;
+        int v;
 
         volatile boolean underProcessing;
 
