@@ -15,8 +15,7 @@ import java.util.PriorityQueue;
 public class FCParallelHeap implements Heap {
     private FC fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
-    private volatile boolean leaderExists;
-    private volatile boolean leaderInTransition;
+    private boolean leaderExists;
     private final int TRIES;
     private final int THRESHOLD;
 
