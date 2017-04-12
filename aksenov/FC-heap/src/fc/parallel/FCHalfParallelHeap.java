@@ -304,11 +304,11 @@ public class FCHalfParallelHeap implements Heap {
                 leaderExists = false;
                 fc.unlock();
             } else {
-                while (request.status == Status.PUSHED && !request.leader) {
+                while (request.status == Status.PUSHED && !request.leader && leaderExists) {
                     fc.addRequest(request);
 //                    sleep();
                 }
-                if (request.leader) { // Someone set me as a leader
+                if (request.leader || !leaderExists) { // Someone set me as a leader or leader does not exist
                     continue;
                 }
                 if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
