@@ -33,8 +33,8 @@ public class FCParallelHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        volatile OperationType type;
-        volatile int v;
+        OperationType type;
+        int v;
 
         public Request() {
             status = Status.PUSHED;
@@ -80,8 +80,8 @@ public class FCParallelHeap implements Heap {
     }
 
     public class List {
-        volatile int value;
-        volatile List next = null;
+        int value;
+        List next = null;
 
         public List(int value) {
             this.value = value;
