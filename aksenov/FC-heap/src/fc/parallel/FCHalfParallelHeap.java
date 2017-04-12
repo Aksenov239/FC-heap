@@ -158,8 +158,7 @@ public class FCHalfParallelHeap implements Heap {
                 }
             }
 
-            if (request.leader && !leaderInTransition &&
-                    (request.status == Status.PUSHED || request.status == Status.FINISHED)) { // I'm the leader
+            if (request.leader && request.status == Status.PUSHED) { // I'm the leader
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
@@ -256,6 +255,7 @@ public class FCHalfParallelHeap implements Heap {
                                 insertRequests[insertStart++].status = Status.FINISHED;
                             } else {
                                 while (heap[heapSize].underProcessing) { // We should swap only with unprocessed vertices
+                                    heap[heapSize].underProcessing = false;
                                     heapSize--;
                                 }
                                 if (node >= heapSize - 1) { // If we again are last or already out then do nothing
