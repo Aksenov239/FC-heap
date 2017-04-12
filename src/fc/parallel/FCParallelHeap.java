@@ -15,7 +15,7 @@ import java.util.PriorityQueue;
 public class FCParallelHeap implements Heap {
     private FC fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
-    private volatile boolean leaderExists;
+    private boolean leaderExists;
     private volatile boolean leaderInTransition;
     private final int TRIES;
     private final int THRESHOLD;
@@ -33,8 +33,8 @@ public class FCParallelHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        volatile OperationType type;
-        volatile int v;
+        OperationType type;
+        int v;
 
         public Request() {
             status = Status.PUSHED;
@@ -62,7 +62,7 @@ public class FCParallelHeap implements Heap {
         }
 
         // Information for sift
-        volatile int siftStart; // start position of sift down for insert and delete
+        int siftStart; // start position of sift down for insert and delete
 
         // Information for siftUp
         // volatile int sizeOfList;
@@ -80,8 +80,8 @@ public class FCParallelHeap implements Heap {
     }
 
     public class List {
-        volatile int value;
-        volatile List next = null;
+        int value;
+        List next = null;
 
         public List(int value) {
             this.value = value;
@@ -261,7 +261,7 @@ public class FCParallelHeap implements Heap {
     }
 
     public class Node {
-        volatile int v;
+        int v;
 
         volatile boolean underProcessing;
 
@@ -577,8 +577,8 @@ public class FCParallelHeap implements Heap {
                 }
 
 //                leaderInTransition = false;
-                request.leader = false;
                 leaderExists = false;
+                request.leader = false;
                 fc.unlock();
             } else {
                 while (request.status == Status.PUSHED && !request.leader) {

@@ -30,7 +30,7 @@ public class FCBinaryHeap implements Heap {
 
     public class Request extends FCRequest implements Comparable<Request> {
         volatile OperationType type;
-        volatile int v;
+        int v;
 
         public Request() {
             status = Status.PUSHED;
