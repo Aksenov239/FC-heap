@@ -15,7 +15,7 @@ import java.util.PriorityQueue;
 public class FCParallelHeap implements Heap {
     private FC fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
-    private boolean leaderExists;
+    private volatile boolean leaderExists;
     private final int TRIES;
     private final int THRESHOLD;
 
@@ -278,9 +278,9 @@ public class FCParallelHeap implements Heap {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
         heap = new Node[size];
-        for (int i = 0; i < heap.length; i++) {
-            heap[i] = new Node(Integer.MAX_VALUE);
-        }
+//        for (int i = 0; i < heap.length; i++) {
+//            heap[i] = new Node(Integer.MAX_VALUE);
+//        }
         TRIES = numThreads;//3;
         THRESHOLD = (int) (Math.ceil(numThreads / 1.7));
     }
@@ -435,9 +435,9 @@ public class FCParallelHeap implements Heap {
                         for (int i = 1; i <= heapSize; i++) {
                             newHeap[i] = heap[i];
                         }
-                        for (int i = heapSize + 1; i < newHeap.length; i++) {
-                            newHeap[i] = new Node(Integer.MAX_VALUE);
-                        }
+//                        for (int i = heapSize + 1; i < newHeap.length; i++) {
+//                            newHeap[i] = new Node(Integer.MAX_VALUE);
+//                        }
                         heap = newHeap;
                     }
 
@@ -523,7 +523,9 @@ public class FCParallelHeap implements Heap {
                         List[] orderedValues = new List[insertRequests.length - insertStart];
                         for (int i = 0; i < orderedValues.length; i++) {
                             orderedValues[i] = new List(insertRequests[i + insertStart].v);
-//                            heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE); // already in the tree
+                            if (heap[i + heapSize + 1] == null) {
+                                heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE); // already in the tree
+                            }
                         }
 
                         int lstart = Integer.highestOneBit(heapSize + 1);
@@ -615,7 +617,10 @@ public class FCParallelHeap implements Heap {
     }
 
     public void sequentialInsert(int v) {
-        heap[++heapSize].v = v;
+        if (heap[++heapSize] == null) {
+            heap[heapSize] = new Node(Integer.MAX_VALUE);
+        }
+        heap[heapSize].v = v;
         int current = heapSize;
 //        System.out.println(current);
         while (current > 1) {
