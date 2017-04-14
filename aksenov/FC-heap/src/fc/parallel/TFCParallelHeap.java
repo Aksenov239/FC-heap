@@ -31,7 +31,7 @@ public class TFCParallelHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        OperationType type;
+        volatile OperationType type;
         int v;
 
         public Request() {
