@@ -6,6 +6,7 @@ import fc.FCRequest;
 
 import java.util.Arrays;
 import java.util.PriorityQueue;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Created by vaksenov on 24.03.2017.
@@ -29,7 +30,7 @@ public class FCBinaryHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        volatile OperationType type;
+        OperationType type;
         int v;
 
         public Request() {
@@ -51,7 +52,6 @@ public class FCBinaryHeap implements Heap {
         }
 
         volatile Status status;
-        volatile boolean leader;
 
         public boolean holdsRequest() {
             return status != Status.FINISHED;
@@ -104,11 +104,12 @@ public class FCBinaryHeap implements Heap {
         heap[++heapSize] = v;
         int current = heapSize;
         while (current > 1) {
-            if (heap[current] < heap[current >> 1]) {
+            int parent = current >> 1;
+            if (heap[current] < heap[parent]) {
                 int q = heap[current];
-                heap[current] = heap[current >> 1];
-                heap[current >> 1] = q;
-                current >>= 2;
+                heap[current] = heap[parent];
+                heap[parent] = q;
+                current = parent;
             } else {
                 break;
             }
@@ -121,10 +122,12 @@ public class FCBinaryHeap implements Heap {
         sequentialInsert(v);
     }
 
+    private ReentrantLock lock = new ReentrantLock();
+
     public void handleRequest(Request request) {
         fc.addRequest(request);
         while (true) {
-            if (fc.tryLock()) { // I'm the leader
+            if (lock.tryLock()) { // I'm the leader
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
@@ -152,13 +155,10 @@ public class FCBinaryHeap implements Heap {
                         break;
                     }
                 }
-
-                request.leader = false;
-                leaderExists = false;
-                fc.unlock();
+                lock.unlock();
                 return;
             } else {
-                while (request.status == Status.PUSHED && fc.isLocked()) {
+                while (request.status == Status.PUSHED && lock.isLocked()) {
 //                    try {
 //                        Thread.sleep(1);
 //                    } catch (InterruptedException e) {

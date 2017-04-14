@@ -6,13 +6,12 @@ import fc.FCRequest;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.PriorityQueue;
 
 /**
  * Created by vaksenov on 24.03.2017.
  */
-public class FCParallelHeap implements Heap {
+public class TFCParallelHeap implements Heap {
     private FC fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
     private volatile boolean leaderExists;
@@ -189,7 +188,6 @@ public class FCParallelHeap implements Heap {
 
         public InsertInfo split() {
             int toLeft = intersectionLeft();
-            assert toLeft < right - left + listLength;
             if (right - left >= toLeft) { // We leave ourselves part of array
                 InsertInfo insertInfo = new InsertInfo(orderedValues, left + toLeft, right,
                         headFromHeap, tailFromHeap, listLength,
@@ -223,8 +221,6 @@ public class FCParallelHeap implements Heap {
                 tailFromHeap = splitPosition;
                 splitPosition.next = null;
                 listLength = toLeft - (right - left);
-                assert headFromHeap.length() == listLength;
-                assert insertInfo.headFromHeap.length() == toRight;
                 return insertInfo;
             } else {
                 List splitPosition = headFromHeap;
@@ -290,7 +286,7 @@ public class FCParallelHeap implements Heap {
     private Node[] heap;
     private int heapSize;
 
-    public FCParallelHeap(int size, int numThreads) {
+    public TFCParallelHeap(int size, int numThreads) {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
         heap = new Node[size];
@@ -339,18 +335,14 @@ public class FCParallelHeap implements Heap {
 
     public void insert(Request request) {
         int current = request.siftStart;
-//        System.err.println("Wait on: " + current);
         while (heap[current].insertInfo == null) {
         } // Wait for someone to wake up us
 
         InsertInfo insertInfo = heap[current].insertInfo;
         heap[current].insertInfo = null;
         while (!insertInfo.finished()) {
-//            System.err.println(current + " " + insertInfo.lrange + " " + insertInfo.rrange + " " + insertInfo.lneed + " " + insertInfo.rneed);
             heap[current].v = insertInfo.replaceMinFromHeap(heap[current].v); // Replace current value
             if (heap[current].underProcessing) { // Then I should split the work and give the right child new info
-//                System.err.println("Split on " + current);
-//                heap[current].underProcessing = false;
                 InsertInfo toRight = insertInfo.split();
                 toRight.slideToRight();
                 heap[(current << 1) + 1].insertInfo = toRight; // Give info to the right child
@@ -359,7 +351,6 @@ public class FCParallelHeap implements Heap {
                 insertInfo.slideToLeft();
                 current = current << 1;
             } else {
-//                System.err.println("Slide: " + current + " " + insertInfo.goToLeft());
                 if (insertInfo.goToLeft()) {
                     insertInfo.slideToLeft();
                     current = current << 1;
@@ -368,7 +359,6 @@ public class FCParallelHeap implements Heap {
                     current = (current << 1) + 1;
                 }
             }
-//            System.err.println("Current: " + current);
         }
         assert insertInfo.lneed <= current && current < insertInfo.rneed;
         heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
@@ -425,7 +415,7 @@ public class FCParallelHeap implements Heap {
 
                     int deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
-                        assert ((Request) requests[i]).status == Status.PUSHED;
+                        assert ((Request) requests[i]).status == Status.PUSHED ;
                         deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
                     }
 
@@ -474,7 +464,6 @@ public class FCParallelHeap implements Heap {
                         for (int i = 0; i < deleteRequests.length; i++) {
                             int node = pq.poll();
                             kbest[i] = node;
-                            heap[node].underProcessing = true;
                             deleteRequests[i].siftStart = 0; // initialize start position of sift
 
                             if (2 * node <= heapSize) {
@@ -485,16 +474,18 @@ public class FCParallelHeap implements Heap {
                             }
                         }
                         Arrays.sort(kbest);
+                        ArrayList<Integer>[] requestsByParity = new ArrayList[2];
+                        for (int i = 0; i < requestsByParity.length; i++) {
+                            requestsByParity[i] = new ArrayList<>();
+                        }
                         for (int i = 0; i < deleteRequests.length; i++) {
                             int node = kbest[i];
                             deleteRequests[i].v = heap[node].v;
 
                             if (node >= heapSize - 1) { // We are the last or way later, then do nothing
                                 if (node != heapSize - 1) {
-                                    heap[node].underProcessing = false;
                                     continue;
                                 } else if (i >= insertRequests.length) { // We are last and there is no inserts left
-                                    heap[node].underProcessing = false;
                                     heapSize--;
                                     continue;
                                 }
@@ -505,30 +496,38 @@ public class FCParallelHeap implements Heap {
                                 insertRequests[insertStart++].status = Status.FINISHED;
                             } else {
                                 while (heap[heapSize].underProcessing) { // We should swap only with unprocessed vertices
-                                    heap[heapSize].underProcessing = false;
                                     heapSize--;
                                 }
                                 if (node >= heapSize - 1) { // If we again are last or already out then do nothing
                                     if (node == heapSize - 1) {
                                         heapSize--;
                                     }
-                                    heap[node].underProcessing = false;
                                     continue;
                                 }
                                 heap[node].v = heap[heapSize--].v;
                                 heap[heapSize + 1].v = Integer.MAX_VALUE; // remove value
                             }
                             deleteRequests[i].siftStart = node;
+                            int k = 1;
+                            int level = 0;
+                            while (k < node) {
+                                k <<= 1;
+                                level++;
+                            }
+                            requestsByParity[level & 1].add(i);
                         }
-                        for (int i = 0; i < deleteRequests.length; i++) {
-                            deleteRequests[i].status = Status.SIFT_DELETE;
-                        }
-                        if (request.status == Status.SIFT_DELETE) { // I have to delete too
-                            siftDown(request);
-                        }
-                        for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
-                            while (deleteRequests[i].status == Status.SIFT_DELETE) {
-//                                sleep();
+                        for (int parity = 0; parity < 2; parity++) {
+                            for (int i : requestsByParity[parity]) {
+                                heap[deleteRequests[i].siftStart].underProcessing = true;
+                                deleteRequests[i].status = Status.SIFT_DELETE;
+                            }
+                            if (request.status == Status.SIFT_DELETE) { // I have to delete too
+                                siftDown(request);
+                            }
+                            for (int i : requestsByParity[parity]) { // Wait for everybody to finish
+                                while (deleteRequests[i].status == Status.SIFT_DELETE) {
+                                    // sleep();
+                                }
                             }
                         }
                     }
