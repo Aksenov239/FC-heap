@@ -523,7 +523,7 @@ public class FCParallelHeap implements Heap {
                             deleteRequests[i].siftStart = node;
                         }
                         for (int i = 0; i < deleteRequests.length; i++) {
-                            if (deleteRequests[i] == Status.PUSHED) {
+                            if (deleteRequests[i].status == Status.PUSHED) {
                                 deleteRequests[i].status = Status.SIFT_DELETE;
                             }
                         }
