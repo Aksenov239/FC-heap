@@ -610,9 +610,8 @@ public class TFCParallelHeap implements Heap {
                 } else if (request.status == Status.SIFT_INSERT) { // I should make a sift up
                     insert(request);
                 }
-                if (!request.leader) {
-                    return;
-                }
+                return;
+                
             }
         }
     }
