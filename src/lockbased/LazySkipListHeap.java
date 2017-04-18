@@ -3,6 +3,7 @@ package lockbased;
 import abstractions.Heap;
 
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -14,23 +15,12 @@ public class LazySkipListHeap implements Heap {
     private Node head;
     private Node tail;
 
-    ThreadLocal<Random> rnd = new ThreadLocal<>();
-
-    private Random getRandom() {
-        Random random = rnd.get();
-        if (random == null) {
-            random = new Random();
-            rnd.set(random);
-        }
-        return random;
-    }
-
     public LazySkipListHeap(int size, int numThreads) {
         clear();
     }
 
     private int randomLevel() {
-        int x = getRandom().nextInt();
+        int x = ThreadLocalRandom.current().nextInt();
         for (int i = 0; i < maxLevel - 1; i++, x >>= 1) {
             if ((x & 1) == 0) {
                 return i + 1;

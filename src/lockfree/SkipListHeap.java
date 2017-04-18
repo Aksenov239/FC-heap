@@ -3,6 +3,7 @@ package lockfree;
 import abstractions.Heap;
 
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
@@ -18,17 +19,6 @@ public class SkipListHeap implements Heap {
      * The topmost head index of the skiplist.
      */
     private transient volatile HeadIndex head;
-
-    ThreadLocal<Random> rnd = new ThreadLocal<>();
-
-    private Random getRandom() {
-        Random random = rnd.get();
-        if (random == null) {
-            random = new Random();
-            rnd.set(random);
-        }
-        return random;
-    }
 
     public SkipListHeap(int size, int threadsNum) {
         head = new HeadIndex(new Node(Integer.MAX_VALUE, BASE_HEADER, null),
@@ -356,7 +346,7 @@ public class SkipListHeap implements Heap {
      * acceptable here.
      */
     private int randomLevel() {
-        int x = getRandom().nextInt();
+        int x = ThreadLocalRandom.current().nextInt();
         for (int i = 0; i < maxLevel - 1; i++, x >>= 1) {
             if ((x & 1) == 0) {
                 return i + 1;
