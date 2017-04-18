@@ -31,7 +31,7 @@ public class TFCParallelHeap implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        volatile OperationType type;
+        OperationType type;
         int v;
 
         public Request() {
@@ -145,11 +145,11 @@ public class TFCParallelHeap implements Heap {
                     orderedValues = null;
                 }
                 listLength++;
-                assert headFromHeap.length() == listLength;
+//                assert headFromHeap.length() == listLength;
                 return res;
             } else { // The first values from heap should be now back and we replace it
                 int res = headFromHeap.value;
-                assert headFromHeap.length() == listLength;
+//                assert headFromHeap.length() == listLength;
                 if (tailFromHeap != headFromHeap) {
                     headFromHeap.value = v;
                     tailFromHeap.next = headFromHeap;
@@ -160,7 +160,7 @@ public class TFCParallelHeap implements Heap {
                 } else {
                     headFromHeap.value = v;
                 }
-                assert headFromHeap.length() == listLength;
+//                assert headFromHeap.length() == listLength;
                 return res;
             }
         }
@@ -360,7 +360,7 @@ public class TFCParallelHeap implements Heap {
                 }
             }
         }
-        assert insertInfo.lneed <= current && current < insertInfo.rneed;
+//        assert insertInfo.lneed <= current && current < insertInfo.rneed;
         heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
         request.status = Status.FINISHED;
     }
@@ -415,17 +415,17 @@ public class TFCParallelHeap implements Heap {
 
                     int deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
-                        assert ((Request) requests[i]).status == Status.PUSHED ;
+//                        assert ((Request) requests[i]).status == Status.PUSHED ;
                         deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
                     }
 
                     Request[] deleteRequests = new Request[deleteSize];
                     Request[] insertRequests = new Request[requests.length - deleteSize];
-                    deleteSize = 0;
-                    for (int i = 0; i < requests.length; i++) {
-                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
-                    }
-                    assert deleteSize == deleteRequests.length;
+//                    deleteSize = 0;
+//                    for (int i = 0; i < requests.length; i++) {
+//                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+//                    }
+//                    assert deleteSize == deleteRequests.length;
 
                     deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
@@ -602,7 +602,7 @@ public class TFCParallelHeap implements Heap {
                     fc.addRequest(request);
 //                    sleep();
                 }
-                if (request.leader || !leaderExists) { // Someone set me as a leader or leader does not exist
+                if (request.status == Status.PUSHED) { // Someone set me as a leader or leader does not exist
                     continue;
                 }
                 if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
