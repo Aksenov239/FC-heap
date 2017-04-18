@@ -605,7 +605,7 @@ public class FCParallelHeapv2 implements Heap {
                     fc.addRequest(request);
 //                    sleep();
                 }
-                if (request.leader || !leaderExists) { // Someone set me as a leader or leader does not exist
+                if (request.status == Status.PUSHED) { // Someone set me as a leader or leader does not exist
                     continue;
                 }
                 if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
