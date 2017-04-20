@@ -527,7 +527,7 @@ public class FCParallelHeapv2 implements Heap {
                         }
                         for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
                             while (deleteRequests[i].status == Status.SIFT_DELETE) {
-                                sleep();
+//                                sleep();
                             }
                         }
                     }
@@ -578,15 +578,15 @@ public class FCParallelHeapv2 implements Heap {
                         }
                         for (int i = insertStart; i < insertRequests.length; i++) {
                             while (insertRequests[i].status == Status.SIFT_INSERT) {
-                                sleep();
+//                                sleep();
                             } // wait while finish
                         }
                     }
 
                     fc.cleanup();
-//                    if (requests.length < THRESHOLD) {
-//                        break;
-//                    }
+                    if (requests.length < THRESHOLD) {
+                        break;
+                    }
 //                    if (!request.leader) {
 //                        leaderInTransition = false;
 //                        return;
@@ -600,9 +600,10 @@ public class FCParallelHeapv2 implements Heap {
             } else {
                 while (request.status == Status.PUSHED && !request.leader && leaderExists) {
                     fc.addRequest(request);
-                    sleep();
+//                    sleep();
                 }
                 if (request.status == Status.PUSHED) { // Someone set me as a leader or leader does not exist
+                    sleep();
                     continue;
                 }
                 if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
