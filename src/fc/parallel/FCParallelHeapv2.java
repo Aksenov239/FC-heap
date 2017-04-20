@@ -30,7 +30,7 @@ public class FCParallelHeapv2 implements Heap {
     }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        volatile OperationType type;
+        OperationType type;
         int v;
 
         public Request() {
@@ -144,7 +144,7 @@ public class FCParallelHeapv2 implements Heap {
                     orderedValues = null;
                 }
                 listLength++;
-                assert headFromHeap.length() == listLength;
+//                assert headFromHeap.length() == listLength;
                 return res;
             } else { // The first values from heap should be now back and we replace it
                 int res = headFromHeap.value;
@@ -159,7 +159,7 @@ public class FCParallelHeapv2 implements Heap {
                 } else {
                     headFromHeap.value = v;
                 }
-                assert headFromHeap.length() == listLength;
+//                assert headFromHeap.length() == listLength;
                 return res;
             }
         }
@@ -187,7 +187,7 @@ public class FCParallelHeapv2 implements Heap {
 
         public InsertInfo split() {
             int toLeft = intersectionLeft();
-            assert toLeft < right - left + listLength;
+//            assert toLeft < right - left + listLength;
             if (right - left >= toLeft) { // We leave ourselves part of array
                 InsertInfo insertInfo = new InsertInfo(orderedValues, left + toLeft, right,
                         headFromHeap, tailFromHeap, listLength,
@@ -221,8 +221,8 @@ public class FCParallelHeapv2 implements Heap {
                 tailFromHeap = splitPosition;
                 splitPosition.next = null;
                 listLength = toLeft - (right - left);
-                assert headFromHeap.length() == listLength;
-                assert insertInfo.headFromHeap.length() == toRight;
+//                assert headFromHeap.length() == listLength;
+//                assert insertInfo.headFromHeap.length() == toRight;
                 return insertInfo;
             } else {
                 List splitPosition = headFromHeap;
@@ -274,24 +274,24 @@ public class FCParallelHeapv2 implements Heap {
     }
 
     public class Node {
+        int v;
+
         volatile boolean underProcessing;
 
         volatile InsertInfo insertInfo; // Wake up thread to work on the right child
 
-        public Node() {
-
+        public Node(int v) {
+            this.v = v;
         }
     }
 
     private Node[] heap;
-    private int[] heapV;
     private int heapSize;
 
     public FCParallelHeapv2(int size, int numThreads) {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
         heap = new Node[size];
-        heapV = new int[size];
 //        for (int i = 0; i < heap.length; i++) {
 //            heap[i] = new Node(Integer.MAX_VALUE);
 //        }
@@ -316,17 +316,17 @@ public class FCParallelHeapv2 implements Heap {
                 }
             }
 
-            if (heapV[current] <= heapV[leftChild]
-                    && (rightChild > heapSize || heapV[current] <= heapV[rightChild])) { // I'm better than children and could finish
+            if (heap[current].v <= heap[leftChild].v
+                    && (rightChild > heapSize || heap[current].v <= heap[rightChild].v)) { // I'm better than children and could finish
                 heap[current].underProcessing = false;
                 request.status = Status.FINISHED;
                 return;
             }
-            int swap = rightChild > heapSize || heapV[leftChild] < heapV[rightChild] ? leftChild : rightChild; // With whom to swap
+            int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
             heap[swap].underProcessing = true;
-            int tmp = heapV[current];
-            heapV[current] = heapV[swap];
-            heapV[swap] = tmp;
+            int tmp = heap[current].v;
+            heap[current].v = heap[swap].v;
+            heap[swap].v = tmp;
 
             heap[current].underProcessing = false;
             current = swap;
@@ -345,7 +345,7 @@ public class FCParallelHeapv2 implements Heap {
         heap[current].insertInfo = null;
         while (!insertInfo.finished()) {
 //            System.err.println(current + " " + insertInfo.lrange + " " + insertInfo.rrange + " " + insertInfo.lneed + " " + insertInfo.rneed);
-            heapV[current] = insertInfo.replaceMinFromHeap(heapV[current]); // Replace current value
+            heap[current].v = insertInfo.replaceMinFromHeap(heap[current].v); // Replace current value
             if (heap[current].underProcessing) { // Then I should split the work and give the right child new info
 //                System.err.println("Split on " + current);
 //                heap[current].underProcessing = false;
@@ -368,8 +368,8 @@ public class FCParallelHeapv2 implements Heap {
             }
 //            System.err.println("Current: " + current);
         }
-        assert insertInfo.lneed <= current && current < insertInfo.rneed;
-        heapV[current] = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
+//        assert insertInfo.lneed <= current && current < insertInfo.rneed;
+        heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
         request.status = Status.FINISHED;
     }
 
@@ -398,7 +398,7 @@ public class FCParallelHeapv2 implements Heap {
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
-                    FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
+                    FCRequest[] requests = fc.loadRequests();
 
                     if (requests.length == 0) {
                         fc.cleanup();
@@ -423,17 +423,17 @@ public class FCParallelHeapv2 implements Heap {
 
                     int deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
-                        assert ((Request) requests[i]).status == Status.PUSHED;
+//                        assert ((Request) requests[i]).status == Status.PUSHED;
                         deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
                     }
 
                     Request[] deleteRequests = new Request[deleteSize];
                     Request[] insertRequests = new Request[requests.length - deleteSize];
-                    deleteSize = 0;
-                    for (int i = 0; i < requests.length; i++) {
-                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
-                    }
-                    assert deleteSize == deleteRequests.length;
+//                    deleteSize = 0;
+//                    for (int i = 0; i < requests.length; i++) {
+//                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+//                    }
+//                    assert deleteSize == deleteRequests.length;
 
                     deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
@@ -447,16 +447,13 @@ public class FCParallelHeapv2 implements Heap {
 
                     if (heapSize + insertRequests.length >= heap.length) { // Increase heap size
                         Node[] newHeap = new Node[2 * heap.length];
-                        int[] newHeapV = new int[2 * heap.length];
                         for (int i = 1; i <= heapSize; i++) {
                             newHeap[i] = heap[i];
-                            newHeapV[i] = heapV[i];
                         }
 //                        for (int i = heapSize + 1; i < newHeap.length; i++) {
 //                            newHeap[i] = new Node(Integer.MAX_VALUE);
 //                        }
                         heap = newHeap;
-                        heapV = newHeapV;
                     }
 
                     if (insertRequests.length > 0) {
@@ -467,7 +464,7 @@ public class FCParallelHeapv2 implements Heap {
 
                     if (deleteRequests.length > 0) { // Prepare for delete minimums
                         PriorityQueue<Integer> pq = new PriorityQueue<>((l, r) -> {
-                            return Integer.compare(heapV[l], heapV[r]);
+                            return Integer.compare(heap[l].v, heap[r].v);
                         });
                         // Looking for elements to remove
                         int[] kbest = new int[deleteRequests.length];
@@ -488,7 +485,7 @@ public class FCParallelHeapv2 implements Heap {
                         Arrays.sort(kbest);
                         for (int i = 0; i < deleteRequests.length; i++) {
                             int node = kbest[i];
-                            deleteRequests[i].v = heapV[node];
+                            deleteRequests[i].v = heap[node].v;
 
                             if (node >= heapSize - 1) { // We are the last or way later, then do nothing
                                 if (node != heapSize - 1) {
@@ -502,7 +499,7 @@ public class FCParallelHeapv2 implements Heap {
                             }
 
                             if (insertStart < insertRequests.length) { // We could add insert some values right now
-                                heapV[node] = insertRequests[insertStart].v;
+                                heap[node].v = insertRequests[insertStart].v;
                                 insertRequests[insertStart++].status = Status.FINISHED;
                             } else {
                                 while (heap[heapSize].underProcessing) { // We should swap only with unprocessed vertices
@@ -516,8 +513,8 @@ public class FCParallelHeapv2 implements Heap {
                                     heap[node].underProcessing = false;
                                     continue;
                                 }
-                                heapV[node] = heapV[heapSize--];
-                                heapV[heapSize + 1] = Integer.MAX_VALUE; // remove value
+                                heap[node].v = heap[heapSize--].v;
+                                heap[heapSize + 1].v = Integer.MAX_VALUE; // remove value
                             }
                             deleteRequests[i].siftStart = node;
                         }
@@ -542,8 +539,7 @@ public class FCParallelHeapv2 implements Heap {
                         for (int i = 0; i < orderedValues.length; i++) {
                             orderedValues[i] = new List(insertRequests[i + insertStart].v);
                             if (heap[i + heapSize + 1] == null) {
-                                heap[i + heapSize + 1] = new Node(); // already in the tree
-                                heapV[i + heapSize + 1] = Integer.MAX_VALUE;
+                                heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE); // already in the tree
                             }
                         }
 
@@ -606,6 +602,11 @@ public class FCParallelHeapv2 implements Heap {
 //                    sleep();
                 }
                 if (request.status == Status.PUSHED) { // Someone set me as a leader or leader does not exist
+                    int x = 0;
+                    for (int i = 0; i < 20; i++) {
+                        x = x ^ i;
+                        i++;
+                    }
                     continue;
                 }
                 if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
@@ -613,9 +614,7 @@ public class FCParallelHeapv2 implements Heap {
                 } else if (request.status == Status.SIFT_INSERT) { // I should make a sift up
                     insert(request);
                 }
-                if (!request.leader) {
-                    return;
-                }
+                return;
             }
         }
     }
@@ -637,17 +636,16 @@ public class FCParallelHeapv2 implements Heap {
 
     public void sequentialInsert(int v) {
         if (heap[++heapSize] == null) {
-            heap[heapSize] = new Node();
-            heapV[heapSize] = Integer.MAX_VALUE;
+            heap[heapSize] = new Node(Integer.MAX_VALUE);
         }
-        heapV[heapSize] = v;
+        heap[heapSize].v = v;
         int current = heapSize;
 //        System.out.println(current);
         while (current > 1) {
-            if (heapV[current] < heapV[current / 2]) {
-                int q = heapV[current];
-                heapV[current] = heapV[current / 2];
-                heapV[current / 2] = q;
+            if (heap[current].v < heap[current / 2].v) {
+                int q = heap[current].v;
+                heap[current].v = heap[current / 2].v;
+                heap[current / 2].v = q;
                 current /= 2;
             } else {
                 break;
@@ -658,7 +656,7 @@ public class FCParallelHeapv2 implements Heap {
     public void clear() {
         fc = new FC();
         for (int i = 0; i < heapSize; i++) {
-            heapV[i + 1] = Integer.MAX_VALUE;
+            heap[i + 1].v = Integer.MAX_VALUE;
         }
         heapSize = 0;
     }
@@ -669,7 +667,7 @@ public class FCParallelHeapv2 implements Heap {
         for (int i = 1; i <= heapSize; i++) {
             if (i != 1)
                 sb.append(", ");
-            sb.append("" + heapV[i]);
+            sb.append("" + heap[i].v);
         }
         sb.append("]");
         return sb.toString();
