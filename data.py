@@ -29,15 +29,17 @@ procs = range(1, 80)
 warmup = 5000
 duration = 5000
 sizes = [800000, 2000000, 4000000, 8000000]
-ranges = [100, 10000]
+ranges = [2147483647]#[100 , 10000]
 
-benchmarks=["fc.parallel.FCParallelHeap",
-           "fc.parallel.FCHalfParallelHeap",
-           "fc.parallel.TFCParallelHeap",
+benchmarks=[
+            "fc.parallel.FCParallelHeap",
+#           "fc.parallel.FCHalfParallelHeap",
            "fc.sequential.FCBinaryHeap",
            "fc.sequential.FCPairingHeap",
            "lockbased.BlockingHeap",
-           "lockbased.LazySkipListHeap"]
+           "lockbased.LazySkipListHeap",
+           "lockfree.SkipListHeap"
+           ]
 
 directory = "out/data/w{}-d{}/".format(warmup, duration)
 if not os.path.isdir(directory):
@@ -46,7 +48,7 @@ if not os.path.isdir(directory):
 for key in keys:
     for size in sizes:
         allranges = list(ranges)
-        allranges.append(2 * size)
+#        allranges.append(2 * size)
         for r in allranges:
             for i in range(len(benchmarks)):
                 bench = benchmarks[i]
@@ -56,5 +58,6 @@ for key in keys:
                 for proc in procs:
                     if not os.path.exists(filename(warmup, duration, proc, size, r, bench)):
                         continue
+                    print(filename(warmup, duration, proc, size, r, bench))
                     results = read_from_file(filename(warmup, duration, proc, size, r, bench), keys)[key][1:]
                     out.write(str(proc) + " " + str(mean(results) / 1000 / 1000) + " " + str(stdev(results) / 1000 / 1000) + "\n")
