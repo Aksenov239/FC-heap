@@ -11,8 +11,8 @@ mainclass = "testing.Measure"
 
 keys = ["throughput"]
 
-warmup = 1000
-duration = 1000
+warmup = 5000
+duration = 5000
 iterations = 5
 procs = [1, 3, 7, 14, 21, 28, 35, 42, 49, 56, 63]
 sizes = [800000, 2000000, 4000000, 8000000]
@@ -22,6 +22,7 @@ max_proc = int(sys.argv[1])
 
 benchmarks=["fc.parallel.FCParallelHeap",
            "fc.parallel.FCHalfParallelHeap",
+           "fc.parallel.TFCParallelHeap",
            "fc.sequential.FCBinaryHeap",
            "fc.sequential.FCPairingHeap",
            "lockbased.BlockingHeap",

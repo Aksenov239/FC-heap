@@ -16,7 +16,7 @@ def read_from_file(filename, keys):
                 good = key
         if good == None:
             continue
-        value = re.sub('(.*?)', '', ll).strip().split(" ")[-1]
+        value = re.sub('(.*?)', '', ll).strip().split(" ")[-2]
         values[key].append(float(value))
     return values
 
@@ -28,11 +28,12 @@ procs = range(1, 80)
 
 warmup = 5000
 duration = 5000
-sizes = [800000, 2000000, 4000000]
+sizes = [800000, 2000000, 4000000, 8000000]
 ranges = [100, 10000]
 
 benchmarks=["fc.parallel.FCParallelHeap",
            "fc.parallel.FCHalfParallelHeap",
+           "fc.parallel.TFCParallelHeap",
            "fc.sequential.FCBinaryHeap",
            "fc.sequential.FCPairingHeap",
            "lockbased.BlockingHeap",
