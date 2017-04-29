@@ -1,5 +1,9 @@
 <project default="compile">
     <target name="compile">
         <mkdir dir="bin"/>
-        <javac srcdir="src" destdir="bin" debug="true" />
+        <javac srcdir="src" destdir="bin" debug="true">
+            <classpath>
+                <pathelement path="lib/jmh-core-0.1.jar"/>
+            </classpath>
+        </javac>
     </target></project>
