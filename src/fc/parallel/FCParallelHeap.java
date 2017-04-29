@@ -312,10 +312,12 @@ public class FCParallelHeap implements Heap {
         while (current <= to) { // While there exists at least one child in heap
             int leftChild = current << 1;
             while (heap[leftChild].underProcessing) {
+                sleep();
             }
             int rightChild = leftChild + 1;
             if (rightChild <= heapSize) {
                 while (heap[rightChild].underProcessing) {
+                    sleep();
                 }
             }
 
@@ -342,6 +344,7 @@ public class FCParallelHeap implements Heap {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
         while (heap[current].insertInfo == null) {
+            sleep();
         } // Wait for someone to wake up us
 
         InsertInfo insertInfo = heap[current].insertInfo;
