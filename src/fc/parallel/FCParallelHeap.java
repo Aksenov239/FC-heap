@@ -3,6 +3,7 @@ package fc.parallel;
 import abstractions.Heap;
 import fc.FC;
 import fc.FCRequest;
+import org.openjdk.jmh.logic.BlackHole;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -311,10 +312,12 @@ public class FCParallelHeap implements Heap {
         while (current <= to) { // While there exists at least one child in heap
             int leftChild = current << 1;
             while (heap[leftChild].underProcessing) {
+                sleep();
             }
             int rightChild = leftChild + 1;
             if (rightChild <= heapSize) {
                 while (heap[rightChild].underProcessing) {
+                    sleep();
                 }
             }
 
@@ -341,6 +344,7 @@ public class FCParallelHeap implements Heap {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
         while (heap[current].insertInfo == null) {
+            sleep();
         } // Wait for someone to wake up us
 
         InsertInfo insertInfo = heap[current].insertInfo;
@@ -378,11 +382,12 @@ public class FCParallelHeap implements Heap {
     volatile FCRequest[] loadedRequests;
 
     public void sleep() {
-        try {
-            Thread.sleep(1);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            Thread.sleep(1);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+        BlackHole.consumeCPU(10);
     }
 
     public void handleRequest(Request request) {
@@ -474,14 +479,14 @@ public class FCParallelHeap implements Heap {
                         for (int i = 0; i < deleteRequests.length; i++) {
                             int node = pq.poll();
                             kbest[i] = node;
-                            heap[node].underProcessing = true;
                             deleteRequests[i].siftStart = 0; // initialize start position of sift
+                            heap[node].underProcessing = true;
 
                             if (2 * node <= heapSize) {
-                                pq.add(2 * node);
+                                pq.add(node << 1);
                             }
                             if (2 * node + 1 <= heapSize) {
-                                pq.add(2 * node + 1);
+                                pq.add((node << 1) + 1);
                             }
                         }
                         Arrays.sort(kbest);
@@ -528,7 +533,7 @@ public class FCParallelHeap implements Heap {
                         }
                         for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
                             while (deleteRequests[i].status == Status.SIFT_DELETE) {
-//                                sleep();
+                                sleep();
                             }
                         }
                     }
@@ -579,7 +584,7 @@ public class FCParallelHeap implements Heap {
                         }
                         for (int i = insertStart; i < insertRequests.length; i++) {
                             while (insertRequests[i].status == Status.SIFT_INSERT) {
-//                                sleep();
+                                sleep();
                             } // wait while finish
                         }
                     }
@@ -601,7 +606,7 @@ public class FCParallelHeap implements Heap {
             } else {
                 while (request.status == Status.PUSHED && !request.leader && leaderExists) {
                     fc.addRequest(request);
-//                    sleep();
+                    sleep();
                 }
                 if (request.status == Status.PUSHED) { // Someone set me as a leader or leader does not exist
                     continue;
