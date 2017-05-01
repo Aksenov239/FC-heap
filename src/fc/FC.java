@@ -52,6 +52,19 @@ public class FC {
         } while (!topUpdater.compareAndSet(this, request.next, request));
     }
 
+    public ArrayList<FCRequest> loadRequestsList() {
+        FCRequest tail = this.top;
+        ArrayList<FCRequest> requests = new ArrayList<>();
+        while (tail != DUMMY) {
+            if (tail.holdsRequest()) {
+                tail.timestamp = current_timestamp;
+                requests.add(tail);
+            }
+            tail = tail.next;
+        }
+        return requests;
+    }
+
     public FCRequest[] loadRequests() {
         FCRequest tail = this.top;
         ArrayList<FCRequest> requests = new ArrayList<>();
