@@ -18,32 +18,31 @@ public class FCParallelHeapv2 implements Heap {
     private final int TRIES;
     private final int THRESHOLD;
 
-    public enum OperationType {
-        DELETE_MIN,
-        INSERT
-    }
+//    OperationType
+//        DELETE_MIN -> false
+//        INSERT -> true
 
-    public enum Status {
-        PUSHED,
-        SIFT_DELETE,
-        SIFT_INSERT,
-        FINISHED
-    }
+//    public enum Status {
+//        PUSHED, -> 0
+//        SIFT_DELETE, -> 1 
+//        SIFT_INSERT, -> 2
+//        FINISHED -> 3         
+//    }
 
     public class Request extends FCRequest implements Comparable<Request> {
-        OperationType type;
+        boolean type;
         int v;
 
         public Request() {
-            status = Status.PUSHED;
+            status = 0;
         }
 
-        public void set(OperationType operationType) {
+        public void set(boolean operationType) {
             this.type = operationType;
-            status = Status.PUSHED;
+            status = 0;
         }
 
-        public void set(OperationType operationType, int value) {
+        public void set(boolean operationType, int value) {
             this.v = value;
             set(operationType);
         }
@@ -52,11 +51,11 @@ public class FCParallelHeapv2 implements Heap {
             return Integer.compare(v, request.v);
         }
 
-        volatile Status status;
+        volatile int status;
         volatile boolean leader;
 
         public boolean holdsRequest() {
-            return status != Status.FINISHED;
+            return status != 3;
         }
 
         // Information for sift
@@ -303,7 +302,7 @@ public class FCParallelHeapv2 implements Heap {
     public void siftDown(Request request) {
         int current = request.siftStart;
         if (current == 0) {
-            request.status = Status.FINISHED;
+            request.status = 3;
             return;
         }
         int to = heapSize >> 1;
@@ -322,7 +321,7 @@ public class FCParallelHeapv2 implements Heap {
             if (heap[current].v <= heap[leftChild].v
                     && (rightChild > heapSize || heap[current].v <= heap[rightChild].v)) { // I'm better than children and could finish
                 heap[current].underProcessing = false;
-                request.status = Status.FINISHED;
+                request.status = 3;
                 return;
             }
             int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
@@ -335,7 +334,7 @@ public class FCParallelHeapv2 implements Heap {
             current = swap;
         }
         heap[current].underProcessing = false;
-        request.status = Status.FINISHED;
+        request.status = 3;
     }
 
     public void insert(Request request) {
@@ -374,7 +373,7 @@ public class FCParallelHeapv2 implements Heap {
         }
 //        assert insertInfo.lneed <= current && current < insertInfo.rneed;
         heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
-        request.status = Status.FINISHED;
+        request.status = 3;
     }
 
     volatile FCRequest[] loadedRequests;
@@ -438,8 +437,8 @@ public class FCParallelHeapv2 implements Heap {
                 }
             }
 
-            if (request.leader && request.status == Status.PUSHED) {
-//                    (request.status == Status.PUSHED || request.status == Status.FINISHED)) { // I'm the leader
+            if (request.leader && request.status == 0) {
+//                    (request.status == 0 || request.status == 3)) { // I'm the leader
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
@@ -450,12 +449,12 @@ public class FCParallelHeapv2 implements Heap {
                         break;
                     }
 
-                    if (request.status == Status.FINISHED) {
+                    if (request.status == 3) {
                         request.leader = false;
                         int search = 0;
 
                         for (int i = 0; i < requests.length; i++) {
-                            if (((Request) requests[i]).type == OperationType.INSERT) {
+                            if (((Request) requests[i]).type == true) {
                                 search = i;
                                 break;
                             }
@@ -468,22 +467,22 @@ public class FCParallelHeapv2 implements Heap {
 
                     int deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
-//                        assert ((Request) requests[i]).status == Status.PUSHED;
-                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+//                        assert ((Request) requests[i]).status == 0;
+                        deleteSize += ((Request) requests[i]).type == false ? 1 : 0;
                     }
 
                     Request[] deleteRequests = new Request[deleteSize];
                     Request[] insertRequests = new Request[requests.length - deleteSize];
 //                    deleteSize = 0;
 //                    for (int i = 0; i < requests.length; i++) {
-//                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+//                        deleteSize += ((Request) requests[i]).type == false ? 1 : 0;
 //                    }
 //                    assert deleteSize == deleteRequests.length;
 
                     deleteSize = 0;
                     for (int i = 0; i < requests.length; i++) {
 //                        assert requests[i].holdsRequest();
-                        if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
+                        if (((Request) requests[i]).type == false) {
                             deleteRequests[deleteSize++] = (Request) requests[i];
                         } else {
                             insertRequests[i - deleteSize] = (Request) requests[i];
@@ -543,7 +542,7 @@ public class FCParallelHeapv2 implements Heap {
 
                             if (insertStart < insertRequests.length) { // We could add insert some values right now
                                 heap[node].v = insertRequests[insertStart].v;
-                                insertRequests[insertStart++].status = Status.FINISHED;
+                                insertRequests[insertStart++].status = 3;
                             } else {
                                 while (heap[heapSize].underProcessing) { // We should swap only with unprocessed vertices
                                     heap[heapSize].underProcessing = false;
@@ -562,13 +561,13 @@ public class FCParallelHeapv2 implements Heap {
                             deleteRequests[i].siftStart = node;
                         }
                         for (int i = 0; i < deleteRequests.length; i++) {
-                            deleteRequests[i].status = Status.SIFT_DELETE;
+                            deleteRequests[i].status = 1;
                         }
-                        if (request.status == Status.SIFT_DELETE) { // I have to delete too
+                        if (request.status == 1) { // I have to delete too
                             siftDown(request);
                         }
                         for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
-                            while (deleteRequests[i].status == Status.SIFT_DELETE) {
+                            while (deleteRequests[i].status == 1) {
                                 sleep();
                             }
                         }
@@ -610,16 +609,16 @@ public class FCParallelHeapv2 implements Heap {
                         }
 
                         for (int i = insertStart; i < insertRequests.length; i++) {
-                            insertRequests[i].status = Status.SIFT_INSERT;
+                            insertRequests[i].status = 2;
                         }
 
                         heapSize = heapSize + orderedValues.length;
 
-                        if (request.status == Status.SIFT_INSERT) {
+                        if (request.status == 2) {
                             insert(request);
                         }
                         for (int i = insertStart; i < insertRequests.length; i++) {
-                            while (insertRequests[i].status == Status.SIFT_INSERT) {
+                            while (insertRequests[i].status == 2) {
                                 sleep();
                             } // wait while finish
                         }
@@ -640,16 +639,16 @@ public class FCParallelHeapv2 implements Heap {
                 leaderExists = false;
                 fc.unlock();
             } else {
-                while (request.status == Status.PUSHED && !request.leader && leaderExists) {
+                while (request.status == 0 && !request.leader && leaderExists) {
                     fc.addRequest(request);
                     sleep();
                 }
-                if (request.status == Status.PUSHED) { // Someone set me as a leader or leader does not exist
+                if (request.status == 0) { // Someone set me as a leader or leader does not exist
                     continue;
                 }
-                if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
+                if (request.status == 1) { // should know the node for sift down
                     siftDown(request);
-                } else if (request.status == Status.SIFT_INSERT) { // I should make a sift up
+                } else if (request.status == 2) { // I should make a sift up
                     insert(request);
                 }
                 return;
@@ -660,7 +659,7 @@ public class FCParallelHeapv2 implements Heap {
     public int deleteMin() {
 //        System.err.println("Delete min");
         Request request = getLocalRequest();
-        request.set(OperationType.DELETE_MIN, -1); // I assume that the insert value for delete min is -1
+        request.set(false, -1); // I assume that the insert value for delete min is -1
         handleRequest(request);
         return request.v;
     }
@@ -668,7 +667,7 @@ public class FCParallelHeapv2 implements Heap {
     public void insert(int v) {
 //        System.err.println("Insert " + v);
         Request request = getLocalRequest();
-        request.set(OperationType.INSERT, v); // I assume that the inserted values are >= 0
+        request.set(true, v); // I assume that the inserted values are >= 0
         handleRequest(request);
     }
 

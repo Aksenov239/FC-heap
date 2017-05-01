@@ -11,7 +11,7 @@
 
    \nextgroupplot[title=Range: 100, ylabel={Size: 800000}, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_800000_100_FCParallelHeap.dat};\label{plots:fcparallel}
-%       \addplot table {data/w10000-d10000/comparison_throughput_800000_FCHalfParallelHeap.dat};\label{plots:fchalfparallel}
+       \addplot table {data/w10000-d10000/comparison_throughput_800000_100_FCParallelHeapv2.dat};\label{plots:fcparallelv2}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_100_FCBinaryHeap.dat};\label{plots:fcbinary}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_100_FCPairingHeap.dat};\label{plots:fcpairing}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_100_LazySkipListHeap.dat};\label{plots:lazyskiplist}
@@ -21,6 +21,7 @@
 
    \nextgroupplot[title=Range: $10^4$, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_800000_10000_FCParallelHeap.dat};\label{plots:fcparallel}
+       \addplot table {data/w10000-d10000/comparison_throughput_800000_10000_FCParallelHeapv2.dat};\label{plots:fcparallelv2}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_10000_FCBinaryHeap.dat};\label{plots:fcbinary}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_10000_FCPairingHeap.dat};\label{plots:fcpairing}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_10000_LazySkipListHeap.dat};\label{plots:lazyskiplist}
@@ -30,6 +31,7 @@
 
    \nextgroupplot[title=Range: $2 \times $\,size, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_800000_1600000_FCParallelHeap.dat};\label{plots:fcparallel}
+       \addplot table {data/w10000-d10000/comparison_throughput_800000_1600000_FCParallelHeapv2.dat};\label{plots:fcparallelv2}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_1600000_FCBinaryHeap.dat};\label{plots:fcbinary}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_1600000_FCPairingHeap.dat};\label{plots:fcpairing}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_1600000_LazySkipListHeap.dat};\label{plots:lazyskiplist}
@@ -39,7 +41,7 @@
 
    \nextgroupplot[title=Range: $2^{31}$, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_800000_2147483647_FCParallelHeap.dat};\label{plots:fcparallel}
-%       \addplot table {data/w10000-d10000/comparison_throughput_800000_2147483647_FCParallelHeapv2.dat};\label{plots:fcparallelv2}
+       \addplot table {data/w10000-d10000/comparison_throughput_800000_2147483647_FCParallelHeapv2.dat};\label{plots:fcparallelv2}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_2147483647_FCBinaryHeap.dat};\label{plots:fcbinary}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_2147483647_FCPairingHeap.dat};\label{plots:fcpairing}
        \addplot table {data/w10000-d10000/comparison_throughput_800000_2147483647_LazySkipListHeap.dat};\label{plots:lazyskiplist}
@@ -50,7 +52,7 @@
 
    \nextgroupplot[ylabel={Size: 2000000}, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_100_FCParallelHeap.dat};
-%       \addplot table {data/w10000-d10000/comparison_throughput_2000000_100_FCHalfParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_2000000_100_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_100_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_100_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_100_LazySkipListHeap.dat};
@@ -59,6 +61,7 @@
 
    \nextgroupplot[cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_10000_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_2000000_10000_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_10000_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_10000_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_10000_LazySkipListHeap.dat};
@@ -67,6 +70,7 @@
 
    \nextgroupplot[cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_4000000_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_2000000_4000000_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_4000000_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_4000000_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_2000000_4000000_LazySkipListHeap.dat};
@@ -75,6 +79,7 @@
 
    \nextgroupplot[cycle list name=color]
        \addplot table {data/w5000-d5000/comparison_throughput_2000000_2147483647_FCParallelHeap.dat};
+       \addplot table {data/w5000-d5000/comparison_throughput_2000000_2147483647_FCParallelHeapv2.dat};
        \addplot table {data/w5000-d5000/comparison_throughput_2000000_2147483647_FCBinaryHeap.dat};
        \addplot table {data/w5000-d5000/comparison_throughput_2000000_2147483647_FCPairingHeap.dat};
        \addplot table {data/w5000-d5000/comparison_throughput_2000000_2147483647_LazySkipListHeap.dat};
@@ -85,7 +90,7 @@
 
    \nextgroupplot[ylabel={Size: 4000000}, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_100_FCParallelHeap.dat};
-%       \addplot table {data/w10000-d10000/comparison_throughput_4000000_100_FCHalfParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_4000000_100_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_100_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_100_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_100_LazySkipListHeap.dat};
@@ -94,6 +99,7 @@
 
    \nextgroupplot[cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_10000_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_4000000_10000_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_10000_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_10000_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_10000_LazySkipListHeap.dat};
@@ -102,6 +108,7 @@
 
    \nextgroupplot[cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_8000000_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_4000000_8000000_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_8000000_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_8000000_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_8000000_LazySkipListHeap.dat};
@@ -110,6 +117,7 @@
 
    \nextgroupplot[cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_2147483647_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_4000000_2147483647_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_2147483647_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_2147483647_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_4000000_2147483647_LazySkipListHeap.dat};
@@ -120,7 +128,7 @@
 
   \nextgroupplot[xlabel={Number of Threads}, ylabel={Size: 8000000}, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_100_FCParallelHeap.dat};
-%       \addplot table {data/w10000-d10000/comparison_throughput_8000000_100_FCHalfParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_8000000_100_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_100_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_100_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_100_LazySkipListHeap.dat};
@@ -129,6 +137,7 @@
 
    \nextgroupplot[xlabel={Number of Threads}, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_10000_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_8000000_10000_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_10000_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_10000_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_10000_LazySkipListHeap.dat};
@@ -137,6 +146,7 @@
  
    \nextgroupplot[xlabel={Number of Threads}, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_16000000_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_8000000_16000000_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_16000000_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_16000000_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_16000000_LazySkipListHeap.dat};
@@ -145,6 +155,7 @@
 
    \nextgroupplot[xlabel={Number of Threads}, cycle list name=color]
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_2147483647_FCParallelHeap.dat};
+       \addplot table {data/w10000-d10000/comparison_throughput_8000000_2147483647_FCParallelHeapv2.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_2147483647_FCBinaryHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_2147483647_FCPairingHeap.dat};
        \addplot table {data/w10000-d10000/comparison_throughput_8000000_2147483647_LazySkipListHeap.dat};
@@ -169,7 +180,7 @@
       inner sep=0.2em,
   ] at ([yshift=1ex]legendpos) {
      \ref{plots:fcparallel}& FC Parallel&[5pt]
-%     \ref{plots:fchalfparallel}& FC Half Parallel&[5pt]
+     \ref{plots:fcparallelv2}& FC Parallel v2&[5pt]
      \ref{plots:fcbinary}& FC Binary \\
      \ref{plots:fcpairing}& FC Pairing &[5pt]
 %     \ref{plots:lazyskiplist}& Lazy Skip-List &[5pt]
