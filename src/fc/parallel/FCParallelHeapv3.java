@@ -370,7 +370,7 @@ public class FCParallelHeapv3 implements Heap {
     volatile FCRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(10);
+        BlackHole.consumeCPU(25);
     }
 
     public class InnerHeap {
@@ -673,7 +673,7 @@ public class FCParallelHeapv3 implements Heap {
 //        if (heap[++heapSize] == null) {
 //            heap[heapSize] = new Node(Integer.MAX_VALUE);
 //        }
-        v[heapSize] = w;
+        v[++heapSize] = w;
         int current = heapSize;
 //        System.out.println(current);
         while (current > 1) {
