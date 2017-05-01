@@ -380,7 +380,7 @@ public class FCParallelHeapv2 implements Heap {
     volatile FCRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(10);
+        BlackHole.consumeCPU(25);
     }
 
     public class InnerHeap {
@@ -501,9 +501,9 @@ public class FCParallelHeapv2 implements Heap {
                         heap = newHeap;
                     }
 
-                    if (insertRequests.length > 0) {
-                        Arrays.sort(insertRequests);
-                    }
+//                    if (insertRequests.length > 0) {
+//                        Arrays.sort(insertRequests);
+//                    }
 
                     int insertStart = 0;
 

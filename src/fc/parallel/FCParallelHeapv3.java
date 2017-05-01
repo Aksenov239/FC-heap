@@ -5,6 +5,7 @@ import fc.FC;
 import fc.FCRequest;
 import org.openjdk.jmh.logic.BlackHole;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -367,7 +368,7 @@ public class FCParallelHeapv3 implements Heap {
         request.status = Status.FINISHED;
     }
 
-    volatile FCRequest[] loadedRequests;
+    volatile ArrayList<FCRequest> loadedRequests;
 
     public void sleep() {
         BlackHole.consumeCPU(25);
@@ -433,9 +434,9 @@ public class FCParallelHeapv3 implements Heap {
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
-                    FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
+                    ArrayList<FCRequest> requests = loadedRequests == null ? fc.loadRequestsList() : loadedRequests;
 
-                    if (requests.length == 0) {
+                    if (requests.size() == 0) {
                         fc.cleanup();
                         break;
                     }
@@ -444,43 +445,34 @@ public class FCParallelHeapv3 implements Heap {
                         request.leader = false;
                         int search = 0;
 
-                        for (int i = 0; i < requests.length; i++) {
-                            if (((Request) requests[i]).type == OperationType.INSERT) {
+                        int i = 0;
+                        for (FCRequest fcRequest : requests) {
+                            if (((Request) fcRequest).type == OperationType.INSERT) {
                                 search = i;
                                 break;
                             }
+                            i++;
                         }
                         loadedRequests = requests;
-                        ((Request) requests[search]).leader = true;
+                        ((Request) requests.get(search)).leader = true;
                         return;
                     }
                     loadedRequests = null;
 
+                    Request[] deleteRequests = new Request[requests.size()];
+                    Request[] insertRequests = new Request[requests.size()];
                     int deleteSize = 0;
-                    for (int i = 0; i < requests.length; i++) {
-//                        assert ((Request) requests[i]).status == Status.PUSHED;
-                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
-                    }
-
-                    Request[] deleteRequests = new Request[deleteSize];
-                    Request[] insertRequests = new Request[requests.length - deleteSize];
-//                    deleteSize = 0;
-//                    for (int i = 0; i < requests.length; i++) {
-//                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
-//                    }
-//                    assert deleteSize == deleteRequests.length;
-
-                    deleteSize = 0;
-                    for (int i = 0; i < requests.length; i++) {
+                    int insertSize = 0;
+                    for (FCRequest fcRequest : requests) {
 //                        assert requests[i].holdsRequest();
-                        if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
-                            deleteRequests[deleteSize++] = (Request) requests[i];
+                        if (((Request) fcRequest).type == OperationType.DELETE_MIN) {
+                            deleteRequests[deleteSize++] = (Request) fcRequest;
                         } else {
-                            insertRequests[i - deleteSize] = (Request) requests[i];
+                            insertRequests[insertSize++] = (Request) fcRequest;
                         }
                     }
 
-                    if (heapSize + insertRequests.length >= v.length) { // Increase heap size
+                    if (heapSize + insertSize >= v.length) { // Increase heap size
                         int[] newV = new int[2 * v.length];
                         AtomicIntegerArray newUnderProcessing = new AtomicIntegerArray(2 * v.length);
                         AtomicReferenceArray<InsertInfo> newInsertInfo = new AtomicReferenceArray<>(2 * v.length);
@@ -504,12 +496,12 @@ public class FCParallelHeapv3 implements Heap {
 
                     int insertStart = 0;
 
-                    if (deleteRequests.length > 0) { // Prepare for delete minimums
-                        InnerHeap pq = new InnerHeap(2 * deleteRequests.length);
+                    if (deleteSize > 0) { // Prepare for delete minimums
+                        InnerHeap pq = new InnerHeap(2 * deleteSize);
                         // Looking for elements to remove
-                        int[] kbest = new int[deleteRequests.length];
+                        int[] kbest = new int[deleteSize];
                         pq.insert(1); // The root should be removed
-                        for (int i = 0; i < deleteRequests.length; i++) {
+                        for (int i = 0; i < deleteSize; i++) {
                             int node = pq.extractMin();
                             kbest[i] = node;
                             underProcessing.lazySet(node, 1);
@@ -523,7 +515,7 @@ public class FCParallelHeapv3 implements Heap {
                             }
                         }
                         Arrays.sort(kbest);
-                        for (int i = 0; i < deleteRequests.length; i++) {
+                        for (int i = 0; i < deleteSize; i++) {
                             int node = kbest[i];
                             deleteRequests[i].v = v[node];
 
@@ -538,7 +530,7 @@ public class FCParallelHeapv3 implements Heap {
                                 }
                             }
 
-                            if (insertStart < insertRequests.length) { // We could add insert some values right now
+                            if (insertStart < insertSize) { // We could add insert some values right now
                                 v[node] = insertRequests[insertStart].v;
                                 insertRequests[insertStart++].status = Status.FINISHED;
                             } else {
@@ -558,24 +550,24 @@ public class FCParallelHeapv3 implements Heap {
                             }
                             deleteRequests[i].siftStart = node;
                         }
-                        for (int i = 0; i < deleteRequests.length; i++) {
+                        for (int i = 0; i < deleteSize; i++) {
                             deleteRequests[i].status = Status.SIFT_DELETE;
                         }
                         if (request.status == Status.SIFT_DELETE) { // I have to delete too
                             siftDown(request);
                         }
-                        for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
+                        for (int i = 0; i < deleteSize; i++) { // Wait for everybody to finish
                             while (deleteRequests[i].status == Status.SIFT_DELETE) {
                                 sleep();
                             }
                         }
                     }
 
-                    if (insertStart < insertRequests.length) { // There are insert requests left
+                    if (insertStart < insertSize) { // There are insert requests left
                         // give the work to thread from root
                         insertRequests[insertStart].siftStart = 1;
 
-                        List[] orderedValues = new List[insertRequests.length - insertStart];
+                        List[] orderedValues = new List[insertSize - insertStart];
                         for (int i = 0; i < orderedValues.length; i++) {
                             orderedValues[i] = new List(insertRequests[i + insertStart].v);
 //                            if (heap[i + heapSize + 1] == null) {
@@ -606,7 +598,7 @@ public class FCParallelHeapv3 implements Heap {
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
 
-                        for (int i = insertStart; i < insertRequests.length; i++) {
+                        for (int i = insertStart; i < insertSize; i++) {
                             insertRequests[i].status = Status.SIFT_INSERT;
                         }
 
@@ -615,7 +607,7 @@ public class FCParallelHeapv3 implements Heap {
                         if (request.status == Status.SIFT_INSERT) {
                             insert(request);
                         }
-                        for (int i = insertStart; i < insertRequests.length; i++) {
+                        for (int i = insertStart; i < insertSize; i++) {
                             while (insertRequests[i].status == Status.SIFT_INSERT) {
                                 sleep();
                             } // wait while finish
