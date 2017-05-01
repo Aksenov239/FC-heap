@@ -7,8 +7,6 @@ import org.openjdk.jmh.logic.BlackHole;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicIntegerArray;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
  * Created by vaksenov on 24.03.2017.
@@ -276,17 +274,28 @@ public class FCParallelHeapv3 implements Heap {
         }
     }
 
-    private AtomicIntegerArray underProcessing;
-    private AtomicReferenceArray<InsertInfo> insertInfo;
-    private int[] v;
+    public class Node {
+        int v;
+
+        volatile boolean underProcessing;
+
+        volatile InsertInfo insertInfo; // Wake up thread to work on the right child
+
+        public Node(int v) {
+            this.v = v;
+        }
+    }
+
+    private Node[] heap;
     private int heapSize;
 
     public FCParallelHeapv3(int size, int numThreads) {
         fc = new FC();
         size = Integer.highestOneBit(size) * 4;
-        underProcessing = new AtomicIntegerArray(size);
-        insertInfo = new AtomicReferenceArray<InsertInfo>(size);
-        v = new int[size];
+        heap = new Node[size];
+//        for (int i = 0; i < heap.length; i++) {
+//            heap[i] = new Node(Integer.MAX_VALUE);
+//        }
         TRIES = numThreads;//3;
         THRESHOLD = (int) (Math.ceil(numThreads / 1.7));
     }
@@ -300,54 +309,54 @@ public class FCParallelHeapv3 implements Heap {
         int to = heapSize >> 1;
         while (current <= to) { // While there exists at least one child in heap
             int leftChild = current << 1;
-            while (underProcessing.get(leftChild) == 1) {
+            while (heap[leftChild].underProcessing) {
                 sleep();
             }
             int rightChild = leftChild + 1;
             if (rightChild <= heapSize) {
-                while (underProcessing.get(rightChild) == 1) {
+                while (heap[rightChild].underProcessing) {
                     sleep();
                 }
             }
 
-            if (v[current] <= v[leftChild]
-                    && (rightChild > heapSize || v[current] <= v[rightChild])) { // I'm better than children and could finish
-                underProcessing.lazySet(current, 0);
+            if (heap[current].v <= heap[leftChild].v
+                    && (rightChild > heapSize || heap[current].v <= heap[rightChild].v)) { // I'm better than children and could finish
+                heap[current].underProcessing = false;
                 request.status = Status.FINISHED;
                 return;
             }
-            int swap = rightChild > heapSize || v[leftChild] < v[rightChild] ? leftChild : rightChild; // With whom to swap
-            underProcessing.set(swap, 1);
-            int tmp = v[current];
-            v[current] = v[swap];
-            v[swap] = tmp;
+            int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
+            heap[swap].underProcessing = true;
+            int tmp = heap[current].v;
+            heap[current].v = heap[swap].v;
+            heap[swap].v = tmp;
 
-            underProcessing.set(current, 0);
+            heap[current].underProcessing = false;
             current = swap;
         }
-        underProcessing.lazySet(current, 0);
+        heap[current].underProcessing = false;
         request.status = Status.FINISHED;
     }
 
     public void insert(Request request) {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
-        while (insertInfo.get(current) == null) {
+        while (heap[current].insertInfo == null) {
             sleep();
         } // Wait for someone to wake up us
 
-        InsertInfo insertInfo = this.insertInfo.get(current);
-        this.insertInfo.set(current, null);
+        InsertInfo insertInfo = heap[current].insertInfo;
+        heap[current].insertInfo = null;
         while (!insertInfo.finished()) {
 //            System.err.println(current + " " + insertInfo.lrange + " " + insertInfo.rrange + " " + insertInfo.lneed + " " + insertInfo.rneed);
-            v[current] = insertInfo.replaceMinFromHeap(v[current]); // Replace current value
-            if (underProcessing.get(current) == 1) { // Then I should split the work and give the right child new info
+            heap[current].v = insertInfo.replaceMinFromHeap(heap[current].v); // Replace current value
+            if (heap[current].underProcessing) { // Then I should split the work and give the right child new info
 //                System.err.println("Split on " + current);
 //                heap[current].underProcessing = false;
                 InsertInfo toRight = insertInfo.split();
                 toRight.slideToRight();
-                this.insertInfo.lazySet((current << 1) + 1, toRight); // Give info to the right child
-                underProcessing.set(current, 0);
+                heap[(current << 1) + 1].insertInfo = toRight; // Give info to the right child
+                heap[current].underProcessing = false;
 
                 insertInfo.slideToLeft();
                 current = current << 1;
@@ -364,7 +373,7 @@ public class FCParallelHeapv3 implements Heap {
 //            System.err.println("Current: " + current);
         }
 //        assert insertInfo.lneed <= current && current < insertInfo.rneed;
-        v[current] = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
+        heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
         request.status = Status.FINISHED;
     }
 
@@ -384,33 +393,33 @@ public class FCParallelHeapv3 implements Heap {
 
         public void insert(int x) {
             a[++size] = x;
-            int w = size;
-            while (w > 1) {
-                int p = w >> 1;
-                if (v[a[w]] < v[a[p]]) {
-                    int q = a[w];
-                    a[w] = a[p];
+            int v = size;
+            while (v > 1) {
+                int p = v >> 1;
+                if (heap[a[v]].v < heap[a[p]].v) {
+                    int q = a[v];
+                    a[v] = a[p];
                     a[p] = q;
                 }
-                w = p;
+                v = p;
             }
         }
 
         public int extractMin() {
             int ans = a[1];
             a[1] = a[size--];
-            int w = 1;
-            while (w <= (size >> 1)) {
-                int left = w << 1;
+            int v = 1;
+            while (v <= (size >> 1)) {
+                int left = v << 1;
                 int right = left + 1;
-                if (right <= size && v[a[left]] > v[a[right]]) {
+                if (right <= size && heap[a[left]].v > heap[a[right]].v) {
                     left = right;
                 }
-                if (v[a[w]] > v[a[left]]) {
+                if (heap[a[v]].v > heap[a[left]].v) {
                     int q = a[left];
-                    a[left] = a[w];
-                    a[w] = q;
-                    w = left;
+                    a[left] = a[v];
+                    a[v] = q;
+                    v = left;
                 } else {
                     break;
                 }
@@ -461,6 +470,12 @@ public class FCParallelHeapv3 implements Heap {
 
                     Request[] deleteRequests = new Request[requests.size()];
                     Request[] insertRequests = new Request[requests.size()];
+//                    deleteSize = 0;
+//                    for (int i = 0; i < requests.length; i++) {
+//                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+//                    }
+//                    assert deleteSize == deleteSize;
+
                     int deleteSize = 0;
                     int insertSize = 0;
                     for (FCRequest fcRequest : requests) {
@@ -472,25 +487,18 @@ public class FCParallelHeapv3 implements Heap {
                         }
                     }
 
-                    if (heapSize + insertSize >= v.length) { // Increase heap size
-                        int[] newV = new int[2 * v.length];
-                        AtomicIntegerArray newUnderProcessing = new AtomicIntegerArray(2 * v.length);
-                        AtomicReferenceArray<InsertInfo> newInsertInfo = new AtomicReferenceArray<>(2 * v.length);
-
+                    if (heapSize + insertSize >= heap.length) { // Increase heap size
+                        Node[] newHeap = new Node[2 * heap.length];
                         for (int i = 1; i <= heapSize; i++) {
-                            newV[i] = v[i];
-                            newUnderProcessing.lazySet(i, underProcessing.get(i));
-                            newInsertInfo.lazySet(i, insertInfo.get(i));
+                            newHeap[i] = heap[i];
                         }
 //                        for (int i = heapSize + 1; i < newHeap.length; i++) {
 //                            newHeap[i] = new Node(Integer.MAX_VALUE);
 //                        }
-                        v = newV;
-                        underProcessing = newUnderProcessing;
-                        insertInfo = newInsertInfo;
+                        heap = newHeap;
                     }
 
-//                    if (insertRequests.length > 0) {
+//                    if (insertSize > 0) {
 //                        Arrays.sort(insertRequests);
 //                    }
 
@@ -504,7 +512,7 @@ public class FCParallelHeapv3 implements Heap {
                         for (int i = 0; i < deleteSize; i++) {
                             int node = pq.extractMin();
                             kbest[i] = node;
-                            underProcessing.lazySet(node, 1);
+                            heap[node].underProcessing = true;
                             deleteRequests[i].siftStart = 0; // initialize start position of sift
 
                             if (2 * node <= heapSize) {
@@ -517,36 +525,36 @@ public class FCParallelHeapv3 implements Heap {
                         Arrays.sort(kbest);
                         for (int i = 0; i < deleteSize; i++) {
                             int node = kbest[i];
-                            deleteRequests[i].v = v[node];
+                            deleteRequests[i].v = heap[node].v;
 
                             if (node >= heapSize - 1) { // We are the last or way later, then do nothing
                                 if (node != heapSize - 1) {
-                                    underProcessing.lazySet(node, 0);
+                                    heap[node].underProcessing = false;
                                     continue;
-                                } else if (i >= insertRequests.length) { // We are last and there is no inserts left
-                                    underProcessing.lazySet(node, 0);
+                                } else if (i >= insertSize) { // We are last and there is no inserts left
+                                    heap[node].underProcessing = false;
                                     heapSize--;
                                     continue;
                                 }
                             }
 
                             if (insertStart < insertSize) { // We could add insert some values right now
-                                v[node] = insertRequests[insertStart].v;
+                                heap[node].v = insertRequests[insertStart].v;
                                 insertRequests[insertStart++].status = Status.FINISHED;
                             } else {
-                                while (underProcessing.get(heapSize) == 1) { // We should swap only with unprocessed vertices
-                                    underProcessing.lazySet(heapSize, 0);
+                                while (heap[heapSize].underProcessing) { // We should swap only with unprocessed vertices
+                                    heap[heapSize].underProcessing = false;
                                     heapSize--;
                                 }
                                 if (node >= heapSize - 1) { // If we again are last or already out then do nothing
                                     if (node == heapSize - 1) {
                                         heapSize--;
                                     }
-                                    underProcessing.lazySet(node, 0);
+                                    heap[node].underProcessing = false;
                                     continue;
                                 }
-                                v[node] = v[heapSize--];
-                                v[heapSize + 1] = Integer.MAX_VALUE; // remove value
+                                heap[node].v = heap[heapSize--].v;
+                                heap[heapSize + 1].v = Integer.MAX_VALUE; // remove value
                             }
                             deleteRequests[i].siftStart = node;
                         }
@@ -570,15 +578,15 @@ public class FCParallelHeapv3 implements Heap {
                         List[] orderedValues = new List[insertSize - insertStart];
                         for (int i = 0; i < orderedValues.length; i++) {
                             orderedValues[i] = new List(insertRequests[i + insertStart].v);
-//                            if (heap[i + heapSize + 1] == null) {
-//                                heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE); // already in the tree
-//                            }
+                            if (heap[i + heapSize + 1] == null) {
+                                heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE); // already in the tree
+                            }
                         }
 
                         int lstart = Integer.highestOneBit(heapSize + 1);
-                        insertInfo.lazySet(1, new InsertInfo(orderedValues, 0, orderedValues.length,
+                        heap[1].insertInfo = new InsertInfo(orderedValues, 0, orderedValues.length,
                                 null, null, 0,
-                                lstart, 2 * lstart, heapSize + 1, heapSize + orderedValues.length + 1));
+                                lstart, 2 * lstart, heapSize + 1, heapSize + orderedValues.length + 1);
 
                         int id = 0;
                         for (int i = 1; i < orderedValues.length; i++) {
@@ -594,7 +602,7 @@ public class FCParallelHeapv3 implements Heap {
 
 //                            System.err.println("LCA: " + lca + " " + left + " " + right);
 
-                            underProcessing.lazySet(lca, 1);
+                            heap[lca].underProcessing = true;
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
 
@@ -661,18 +669,18 @@ public class FCParallelHeapv3 implements Heap {
         handleRequest(request);
     }
 
-    public void sequentialInsert(int w) {
-//        if (heap[++heapSize] == null) {
-//            heap[heapSize] = new Node(Integer.MAX_VALUE);
-//        }
-        v[++heapSize] = w;
+    public void sequentialInsert(int v) {
+        if (heap[++heapSize] == null) {
+            heap[heapSize] = new Node(Integer.MAX_VALUE);
+        }
+        heap[heapSize].v = v;
         int current = heapSize;
 //        System.out.println(current);
         while (current > 1) {
-            if (v[current] < v[current / 2]) {
-                int q = v[current];
-                v[current] = v[current / 2];
-                v[current / 2] = q;
+            if (heap[current].v < heap[current / 2].v) {
+                int q = heap[current].v;
+                heap[current].v = heap[current / 2].v;
+                heap[current / 2].v = q;
                 current /= 2;
             } else {
                 break;
@@ -683,7 +691,7 @@ public class FCParallelHeapv3 implements Heap {
     public void clear() {
         fc = new FC();
         for (int i = 0; i < heapSize; i++) {
-            v[i + 1] = Integer.MAX_VALUE;
+            heap[i + 1].v = Integer.MAX_VALUE;
         }
         heapSize = 0;
     }
@@ -694,7 +702,7 @@ public class FCParallelHeapv3 implements Heap {
         for (int i = 1; i <= heapSize; i++) {
             if (i != 1)
                 sb.append(", ");
-            sb.append("" + v[i]);
+            sb.append("" + heap[i].v);
         }
         sb.append("]");
         return sb.toString();
