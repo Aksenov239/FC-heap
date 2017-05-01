@@ -3,6 +3,7 @@ package fc.parallel;
 import abstractions.Heap;
 import fc.FC;
 import fc.FCRequest;
+import org.openjdk.jmh.logic.BlackHole;
 
 import java.util.Arrays;
 import java.util.PriorityQueue;
@@ -375,13 +376,53 @@ public class FCParallelHeapv2 implements Heap {
 
     volatile FCRequest[] loadedRequests;
 
-    public int sleep() {
-        int x = 0;
-        for (int i = 0; i < 20; i++) {
-            x = x ^ i;
-            i++;
+    public void sleep() {
+        BlackHole.consumeCPU(10);
+    }
+
+    public class InnerHeap {
+        int[] a;
+        int size = 0;
+
+        public InnerHeap(int size) {
+            a = new int[size + 1];
         }
-        return x;
+
+        public void insert(int x) {
+            a[++size] = x;
+            int v = size;
+            while (v > 1) {
+                int p = v >> 1;
+                if (heap[a[v]].v < heap[a[p]].v) {
+                    int q = a[v];
+                    a[v] = a[p];
+                    a[p] = q;
+                }
+                v = p;
+            }
+        }
+
+        public int extractMin() {
+            int ans = a[1];
+            a[1] = a[size--];
+            int v = 1;
+            while (v <= (size >> 1)) {
+                int left = v << 1;
+                int right = left + 1;
+                if (right <= size && heap[a[left]].v > heap[a[right]].v) {
+                    left = right;
+                }
+                if (heap[a[v]].v > heap[a[left]].v) {
+                    int q = a[left];
+                    a[left] = a[v];
+                    a[v] = q;
+                    v = left;
+                } else {
+                    break;
+                }
+            }
+            return ans;
+        }
     }
 
     public void handleRequest(Request request) {
@@ -399,7 +440,7 @@ public class FCParallelHeapv2 implements Heap {
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
-                    FCRequest[] requests = fc.loadRequests();
+                    FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
 
                     if (requests.length == 0) {
                         fc.cleanup();
@@ -464,23 +505,21 @@ public class FCParallelHeapv2 implements Heap {
                     int insertStart = 0;
 
                     if (deleteRequests.length > 0) { // Prepare for delete minimums
-                        PriorityQueue<Integer> pq = new PriorityQueue<>((l, r) -> {
-                            return Integer.compare(heap[l].v, heap[r].v);
-                        });
+                        InnerHeap pq = new InnerHeap(2 * deleteRequests.length);
                         // Looking for elements to remove
                         int[] kbest = new int[deleteRequests.length];
-                        pq.add(1); // The root should be removed
+                        pq.insert(1); // The root should be removed
                         for (int i = 0; i < deleteRequests.length; i++) {
-                            int node = pq.poll();
+                            int node = pq.extractMin();
                             kbest[i] = node;
                             heap[node].underProcessing = true;
                             deleteRequests[i].siftStart = 0; // initialize start position of sift
 
                             if (2 * node <= heapSize) {
-                                pq.add(2 * node);
+                                pq.insert(2 * node);
                             }
                             if (2 * node + 1 <= heapSize) {
-                                pq.add(2 * node + 1);
+                                pq.insert(2 * node + 1);
                             }
                         }
                         Arrays.sort(kbest);
@@ -584,9 +623,9 @@ public class FCParallelHeapv2 implements Heap {
                     }
 
                     fc.cleanup();
-                    if (requests.length < THRESHOLD) {
-                        break;
-                    }
+//                    if (requests.length < THRESHOLD) {
+//                        break;
+//                    }
 //                    if (!request.leader) {
 //                        leaderInTransition = false;
 //                        return;
@@ -603,7 +642,6 @@ public class FCParallelHeapv2 implements Heap {
 //                    sleep();
                 }
                 if (request.status == Status.PUSHED) { // Someone set me as a leader or leader does not exist
-                    sleep();
                     continue;
                 }
                 if (request.status == Status.SIFT_DELETE) { // should know the node for sift down
