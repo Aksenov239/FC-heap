@@ -289,6 +289,9 @@ public class FCParallelHeapv2 implements Heap {
 
     private Node[] heap;
     private int heapSize;
+    
+    private Request[] insertRequests;
+    private Request[] deleteRequests;
 
     public FCParallelHeapv2(int size, int numThreads) {
         fc = new FCArray(numThreads);
@@ -298,6 +301,9 @@ public class FCParallelHeapv2 implements Heap {
 //        for (int i = 0; i < heap.length; i++) {
 //            heap[i] = new Node(Integer.MAX_VALUE);
 //        }
+        
+        insertRequests = new Request[numThreads];
+        deleteRequests = new Request[numThreads];
         TRIES = numThreads;//3;
         THRESHOLD = (int) (Math.ceil(numThreads / 1.7));
     }
@@ -468,31 +474,21 @@ public class FCParallelHeapv2 implements Heap {
                     }
                     loadedRequests = null;
 
-                    int deleteSize = 0;
-                    for (int i = 0; i < requests.length; i++) {
-//                        assert ((Request) requests[i]).status == 0;
-                        deleteSize += ((Request) requests[i]).type == false ? 1 : 0;
-                    }
-
-                    Request[] deleteRequests = new Request[deleteSize];
-                    Request[] insertRequests = new Request[requests.length - deleteSize];
-//                    deleteSize = 0;
-//                    for (int i = 0; i < requests.length; i++) {
-//                        deleteSize += ((Request) requests[i]).type == false ? 1 : 0;
-//                    }
-//                    assert deleteSize == deleteRequests.length;
-
-                    deleteSize = 0;
+                    int deleteSizeF = 0;
+                    int insertSizeF = 0;
                     for (int i = 0; i < requests.length; i++) {
 //                        assert requests[i].holdsRequest();
                         if (((Request) requests[i]).type == false) {
-                            deleteRequests[deleteSize++] = (Request) requests[i];
+                            deleteRequests[deleteSizeF++] = (Request) requests[i];
                         } else {
-                            insertRequests[i - deleteSize] = (Request) requests[i];
+                            insertRequests[insertSizeF++] = (Request) requests[i];
                         }
                     }
 
-                    if (heapSize + insertRequests.length >= heap.length) { // Increase heap size
+                    final int deleteSize = deleteSizeF;
+                    final int insertSize = insertSizeF;
+
+                    if (heapSize + insertSize >= heap.length) { // Increase heap size
                         Node[] newHeap = new Node[2 * heap.length];
                         for (int i = 1; i <= heapSize; i++) {
                             newHeap[i] = heap[i];
@@ -503,18 +499,18 @@ public class FCParallelHeapv2 implements Heap {
                         heap = newHeap;
                     }
 
-//                    if (insertRequests.length > 0) {
+//                    if (insertSize > 0) {
 //                        Arrays.sort(insertRequests);
 //                    }
 
                     int insertStart = 0;
 
-                    if (deleteRequests.length > 0) { // Prepare for delete minimums
-                        InnerHeap pq = new InnerHeap(2 * deleteRequests.length);
+                    if (deleteSize > 0) { // Prepare for delete minimums
+                        InnerHeap pq = new InnerHeap(2 * deleteSize);
                         // Looking for elements to remove
-                        int[] kbest = new int[deleteRequests.length];
+                        int[] kbest = new int[deleteSize];
                         pq.insert(1); // The root should be removed
-                        for (int i = 0; i < deleteRequests.length; i++) {
+                        for (int i = 0; i < deleteSize; i++) {
                             int node = pq.extractMin();
                             kbest[i] = node;
                             heap[node].underProcessing = true;
@@ -528,7 +524,7 @@ public class FCParallelHeapv2 implements Heap {
                             }
                         }
                         Arrays.sort(kbest);
-                        for (int i = 0; i < deleteRequests.length; i++) {
+                        for (int i = 0; i < deleteSize; i++) {
                             int node = kbest[i];
                             deleteRequests[i].v = heap[node].v;
 
@@ -536,14 +532,14 @@ public class FCParallelHeapv2 implements Heap {
                                 if (node != heapSize - 1) {
                                     heap[node].underProcessing = false;
                                     continue;
-                                } else if (i >= insertRequests.length) { // We are last and there is no inserts left
+                                } else if (i >= insertSize) { // We are last and there is no inserts left
                                     heap[node].underProcessing = false;
                                     heapSize--;
                                     continue;
                                 }
                             }
 
-                            if (insertStart < insertRequests.length) { // We could add insert some values right now
+                            if (insertStart < insertSize) { // We could add insert some values right now
                                 heap[node].v = insertRequests[insertStart].v;
                                 insertRequests[insertStart++].status = 3;
                             } else {
@@ -563,24 +559,24 @@ public class FCParallelHeapv2 implements Heap {
                             }
                             deleteRequests[i].siftStart = node;
                         }
-                        for (int i = 0; i < deleteRequests.length; i++) {
+                        for (int i = 0; i < deleteSize; i++) {
                             deleteRequests[i].status = 1;
                         }
                         if (request.status == 1) { // I have to delete too
                             siftDown(request);
                         }
-                        for (int i = 0; i < deleteRequests.length; i++) { // Wait for everybody to finish
+                        for (int i = 0; i < deleteSize; i++) { // Wait for everybody to finish
                             while (deleteRequests[i].status == 1) {
                                 sleep();
                             }
                         }
                     }
 
-                    if (insertStart < insertRequests.length) { // There are insert requests left
+                    if (insertStart < insertSize) { // There are insert requests left
                         // give the work to thread from root
                         insertRequests[insertStart].siftStart = 1;
 
-                        List[] orderedValues = new List[insertRequests.length - insertStart];
+                        List[] orderedValues = new List[insertSize - insertStart];
                         for (int i = 0; i < orderedValues.length; i++) {
                             orderedValues[i] = new List(insertRequests[i + insertStart].v);
                             if (heap[i + heapSize + 1] == null) {
@@ -611,7 +607,7 @@ public class FCParallelHeapv2 implements Heap {
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
 
-                        for (int i = insertStart; i < insertRequests.length; i++) {
+                        for (int i = insertStart; i < insertSize; i++) {
                             insertRequests[i].status = 2;
                         }
 
@@ -620,7 +616,7 @@ public class FCParallelHeapv2 implements Heap {
                         if (request.status == 2) {
                             insert(request);
                         }
-                        for (int i = insertStart; i < insertRequests.length; i++) {
+                        for (int i = insertStart; i < insertSize; i++) {
                             while (insertRequests[i].status == 2) {
                                 sleep();
                             } // wait while finish
