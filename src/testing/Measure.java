@@ -65,6 +65,7 @@ public class Measure {
 
         if (!withStats) {
             System.out.println("Total time spent:    \t" + totalTime);
+            heap.clear();
             return;
         }
 
