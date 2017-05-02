@@ -314,26 +314,27 @@ public class FCParallelHeapv2 implements Heap {
             request.status = 3;
             return;
         }
-        int to = heapSize >> 1;
+        final int to = heapSize >> 1;
         while (current <= to) { // While there exists at least one child in heap
-            int leftChild = current << 1;
+            final int leftChild = current << 1;
             while (heap[leftChild].underProcessing) {
                 sleep();
             }
-            int rightChild = leftChild + 1;
+            final int rightChild = leftChild + 1;
             if (rightChild <= heapSize) {
                 while (heap[rightChild].underProcessing) {
                     sleep();
                 }
             }
 
-            if (heap[current].v <= heap[leftChild].v
-                    && (rightChild > heapSize || heap[current].v <= heap[rightChild].v)) { // I'm better than children and could finish
+            final int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
+
+            if (heap[current].v <= heap[swap].v) { // I'm better than children and could finish
                 heap[current].underProcessing = false;
                 request.status = 3;
                 return;
             }
-            int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
+
             heap[swap].underProcessing = true;
             int tmp = heap[current].v;
             heap[current].v = heap[swap].v;
@@ -388,7 +389,7 @@ public class FCParallelHeapv2 implements Heap {
     volatile FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(25);
+        BlackHole.consumeCPU(300);
     }
 
     public class InnerHeap {
