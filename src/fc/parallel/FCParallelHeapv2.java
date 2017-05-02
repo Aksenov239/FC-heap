@@ -2,6 +2,7 @@ package fc.parallel;
 
 import abstractions.Heap;
 import fc.FC;
+import fc.FCArray;
 import fc.FCRequest;
 import org.openjdk.jmh.logic.BlackHole;
 
@@ -12,7 +13,8 @@ import java.util.PriorityQueue;
  * Created by vaksenov on 24.03.2017.
  */
 public class FCParallelHeapv2 implements Heap {
-    private FC fc;
+    private FCArray fc;
+    private int threads;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
     private volatile boolean leaderExists;
     private final int TRIES;
@@ -29,7 +31,7 @@ public class FCParallelHeapv2 implements Heap {
 //        FINISHED -> 3         
 //    }
 
-    public class Request extends FCRequest implements Comparable<Request> {
+    public class Request extends FCArray.FCRequest implements Comparable<Request> {
         boolean type;
         int v;
 
@@ -289,7 +291,8 @@ public class FCParallelHeapv2 implements Heap {
     private int heapSize;
 
     public FCParallelHeapv2(int size, int numThreads) {
-        fc = new FC();
+        fc = new FCArray(numThreads);
+        threads = numThreads;
         size = Integer.highestOneBit(size) * 4;
         heap = new Node[size];
 //        for (int i = 0; i < heap.length; i++) {
@@ -376,7 +379,7 @@ public class FCParallelHeapv2 implements Heap {
         request.status = 3;
     }
 
-    volatile FCRequest[] loadedRequests;
+    volatile FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
         BlackHole.consumeCPU(25);
@@ -442,7 +445,7 @@ public class FCParallelHeapv2 implements Heap {
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
-                    FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
+                    FCArray.FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
 
                     if (requests.length == 0) {
                         fc.cleanup();
@@ -691,7 +694,8 @@ public class FCParallelHeapv2 implements Heap {
     }
 
     public void clear() {
-        fc = new FC();
+        fc = new FCArray(threads);
+        allocatedRequests = new ThreadLocal<>();
         for (int i = 0; i < heapSize; i++) {
             heap[i + 1].v = Integer.MAX_VALUE;
         }
