@@ -289,9 +289,9 @@ public class FCParallelHeapv2 implements Heap {
 
     private Node[] heap;
     private int heapSize;
-    
-    private Request[] insertRequests;
-    private Request[] deleteRequests;
+
+    final private Request[] insertRequests;
+    final private Request[] deleteRequests;
 
     public FCParallelHeapv2(int size, int numThreads) {
         fc = new FCArray(numThreads);
@@ -301,7 +301,7 @@ public class FCParallelHeapv2 implements Heap {
 //        for (int i = 0; i < heap.length; i++) {
 //            heap[i] = new Node(Integer.MAX_VALUE);
 //        }
-        
+
         insertRequests = new Request[numThreads];
         deleteRequests = new Request[numThreads];
         TRIES = numThreads;//3;
@@ -500,9 +500,9 @@ public class FCParallelHeapv2 implements Heap {
                         heap = newHeap;
                     }
 
-//                    if (insertSize > 0) {
-//                        Arrays.sort(insertRequests);
-//                    }
+                    if (insertSize > 0) {
+                        Arrays.sort(insertRequests);
+                    }
 
                     int insertStart = 0;
 
