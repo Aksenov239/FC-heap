@@ -501,7 +501,7 @@ public class FCParallelHeapv2 implements Heap {
                     }
 
                     if (insertSize > 0) {
-                        Arrays.sort(insertRequests);
+                        Arrays.sort(insertRequests, 0, insertSize);
                     }
 
                     int insertStart = 0;
