@@ -293,7 +293,7 @@ public class FCParallelHeapR1 implements Heap {
     final private Request[] insertRequests;
     final private Request[] deleteRequests;
 
-    public FCParallelHeapv2(int size, int numThreads) {
+    public FCParallelHeapR1(int size, int numThreads) {
         fc = new FCArray(numThreads);
         threads = numThreads;
         size = Integer.highestOneBit(size) * 4;
