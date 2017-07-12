@@ -1,16 +1,15 @@
 package fc;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * Created by vaksenov on 16.01.2017.
  */
 public class FC {
     private final static int DELTA = 1000;
+    public final static int MAX_THREADS = 64;
 
     static final AtomicIntegerFieldUpdater<FC> lockUpdater =
             AtomicIntegerFieldUpdater.newUpdater(FC.class, "lock");
@@ -44,7 +43,7 @@ public class FC {
     }
 
     public void addRequest(FCRequest request) {
-        if (request.next != null || !request.holdsRequest()) { // The request is not old yet
+        if (request.next != null) { // The request is not old yet
             return;
         }
         do {
@@ -65,17 +64,26 @@ public class FC {
         return requests;
     }
 
+    private static ThreadLocal<FCRequest[]> tlReq = new ThreadLocal<FCRequest[]>() {
+        @Override
+        protected FCRequest[] initialValue() {
+            return new FCRequest[MAX_THREADS + 1];
+        }
+    };
+
     public FCRequest[] loadRequests() {
         FCRequest tail = this.top;
-        ArrayList<FCRequest> requests = new ArrayList<>();
+        FCRequest[] requests = tlReq.get();
+        int i = 0;
         while (tail != DUMMY) {
             if (tail.holdsRequest()) {
                 tail.timestamp = current_timestamp;
-                requests.add(tail);
+                requests[i++] = tail;
             }
             tail = tail.next;
         }
-        return requests.toArray(new FCRequest[0]);
+        requests[i] = null;
+        return requests;
     }
 
     public void cleanup() {
