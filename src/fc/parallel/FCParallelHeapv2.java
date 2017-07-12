@@ -15,7 +15,17 @@ import java.util.PriorityQueue;
 public class FCParallelHeapv2 implements Heap {
     private FCArray fc;
     private int threads;
-    private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
+    private ThreadLocal<Request> allocatedRequests = new ThreadLocal<Request>();
+
+    private Request getLocalRequest() {
+        Request request = allocatedRequests.get();
+        if (request == null) {
+            request = new Request();
+            allocatedRequests.set(request);
+        }
+        return request;
+    }
+
     private volatile boolean leaderExists;
     private final int TRIES;
     private final int THRESHOLD;
@@ -69,20 +79,15 @@ public class FCParallelHeapv2 implements Heap {
         // volatile List insertPosition;
     }
 
-    private Request getLocalRequest() {
-        Request request = allocatedRequests.get();
-        if (request == null) {
-            request = new Request();
-            allocatedRequests.set(request);
-        }
-        return request;
-    }
-
     public class List {
         int value;
         List next = null;
 
         public List(int value) {
+            this.value = value;
+        }
+
+        public void set(int value) {
             this.value = value;
         }
 
@@ -292,6 +297,9 @@ public class FCParallelHeapv2 implements Heap {
 
     final private Request[] insertRequests;
     final private Request[] deleteRequests;
+    final private InnerHeap innerHeap;
+    final private int[] kbest;
+    final private List[] orderedValues;
 
     public FCParallelHeapv2(int size, int numThreads) {
         fc = new FCArray(numThreads);
@@ -306,6 +314,13 @@ public class FCParallelHeapv2 implements Heap {
         deleteRequests = new Request[numThreads];
         TRIES = numThreads;//3;
         THRESHOLD = (int) (Math.ceil(numThreads / 1.7));
+
+        innerHeap = new InnerHeap(2 * numThreads + 1);
+        kbest = new int[numThreads];
+        orderedValues = new List[numThreads];
+        for (int i = 0; i < orderedValues.length; i++) {
+            orderedValues[i] = new List(0);
+        }
     }
 
     public void siftDown(Request request) {
@@ -389,7 +404,7 @@ public class FCParallelHeapv2 implements Heap {
     volatile FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(300);
+//        BlackHole.consumeCPU(100);
     }
 
     public class InnerHeap {
@@ -398,6 +413,10 @@ public class FCParallelHeapv2 implements Heap {
 
         public InnerHeap(int size) {
             a = new int[size + 1];
+        }
+
+        public void clear() {
+            size = 0;
         }
 
         public void insert(int x) {
@@ -454,7 +473,7 @@ public class FCParallelHeapv2 implements Heap {
                 for (int t = 0; t < TRIES; t++) {
                     FCArray.FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
 
-                    if (requests.length == 0) {
+                    if (requests[0] == null) {
                         fc.cleanup();
                         break;
                     }
@@ -464,7 +483,11 @@ public class FCParallelHeapv2 implements Heap {
                         int search = 0;
 
                         for (int i = 0; i < requests.length; i++) {
-                            if (((Request) requests[i]).type == true) {
+                            FCArray.FCRequest r = requests[i];
+                            if (r == null) {
+                                break;
+                            }
+                            if (((Request) r).type == true) {
                                 search = i;
                                 break;
                             }
@@ -479,10 +502,14 @@ public class FCParallelHeapv2 implements Heap {
                     int insertSizeF = 0;
                     for (int i = 0; i < requests.length; i++) {
 //                        assert requests[i].holdsRequest();
-                        if (((Request) requests[i]).type == false) {
-                            deleteRequests[deleteSizeF++] = (Request) requests[i];
+                        Request r = (Request) requests[i];
+                        if (r == null) {
+                            break;
+                        }
+                        if (r.type == false) {
+                            deleteRequests[deleteSizeF++] = r;
                         } else {
-                            insertRequests[insertSizeF++] = (Request) requests[i];
+                            insertRequests[insertSizeF++] = r;
                         }
                     }
 
@@ -507,9 +534,9 @@ public class FCParallelHeapv2 implements Heap {
                     int insertStart = 0;
 
                     if (deleteSize > 0) { // Prepare for delete minimums
-                        InnerHeap pq = new InnerHeap(2 * deleteSize);
+                        InnerHeap pq = innerHeap;
+                        pq.clear();
                         // Looking for elements to remove
-                        int[] kbest = new int[deleteSize];
                         pq.insert(1); // The root should be removed
                         for (int i = 0; i < deleteSize; i++) {
                             int node = pq.extractMin();
@@ -524,7 +551,7 @@ public class FCParallelHeapv2 implements Heap {
                                 pq.insert(2 * node + 1);
                             }
                         }
-                        Arrays.sort(kbest);
+                        Arrays.sort(kbest, 0, deleteSize);
                         for (int i = 0; i < deleteSize; i++) {
                             int node = kbest[i];
                             deleteRequests[i].v = heap[node].v;
@@ -577,21 +604,21 @@ public class FCParallelHeapv2 implements Heap {
                         // give the work to thread from root
                         insertRequests[insertStart].siftStart = 1;
 
-                        List[] orderedValues = new List[insertSize - insertStart];
-                        for (int i = 0; i < orderedValues.length; i++) {
-                            orderedValues[i] = new List(insertRequests[i + insertStart].v);
+                        int orderedValuesLength = insertSize - insertStart;
+                        for (int i = 0; i < orderedValuesLength; i++) {
+                            orderedValues[i].set(insertRequests[i + insertStart].v);
                             if (heap[i + heapSize + 1] == null) {
                                 heap[i + heapSize + 1] = new Node(Integer.MAX_VALUE); // already in the tree
                             }
                         }
 
                         int lstart = Integer.highestOneBit(heapSize + 1);
-                        heap[1].insertInfo = new InsertInfo(orderedValues, 0, orderedValues.length,
+                        heap[1].insertInfo = new InsertInfo(orderedValues, 0, orderedValuesLength,
                                 null, null, 0,
-                                lstart, 2 * lstart, heapSize + 1, heapSize + orderedValues.length + 1);
+                                lstart, 2 * lstart, heapSize + 1, heapSize + orderedValuesLength + 1);
 
                         int id = 0;
-                        for (int i = 1; i < orderedValues.length; i++) {
+                        for (int i = 1; i < orderedValuesLength; i++) {
                             int left = i + heapSize;
                             int right = i + 1 + heapSize;
                             int lca = 0;
@@ -612,7 +639,7 @@ public class FCParallelHeapv2 implements Heap {
                             insertRequests[i].status = 2;
                         }
 
-                        heapSize = heapSize + orderedValues.length;
+                        heapSize = heapSize + orderedValuesLength;
 
                         if (request.status == 2) {
                             insert(request);

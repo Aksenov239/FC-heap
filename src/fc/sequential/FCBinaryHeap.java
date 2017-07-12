@@ -141,17 +141,23 @@ public class FCBinaryHeap implements Heap {
                         heap = newHeap;
                     }
 
+                    int length = requests.length;
                     for (int i = 0; i < requests.length; i++) {
-                        if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
-                            remove(request);
-                        } else {
-                            insert(request);
+                        FCRequest r = requests[i];
+                        if (r == null) {
+                            length = i;
+                            break;
                         }
-                        ((Request)requests[i]).status = Status.FINISHED;
+                        if (((Request) r).type == OperationType.DELETE_MIN) {
+                            remove((Request) r);
+                        } else {
+                            insert((Request) r);
+                        }
+                        ((Request) r).status = Status.FINISHED;
                     }
 
                     fc.cleanup();
-                    if (requests.length < THRESHOLD) {
+                    if (length < THRESHOLD) {
                         break;
                     }
                 }

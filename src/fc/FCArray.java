@@ -1,8 +1,8 @@
 package fc;
 
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
  * Created by vaksenov on 16.01.2017.
@@ -42,32 +42,35 @@ public class FCArray {
     }
 
     public void addRequest(FCRequest request) {
-        if (!request.holdsRequest()) { // The request is not old yet
+/*        if (!request.holdsRequest()) { // The request is not old yet
             return;
-        }
+        }*/
 
         if (request.pos == -1) {
-            
             request.pos = lengthUpdater.getAndIncrement(this);
             requests.set(request.pos, request);
         }
     }
 
-    public ArrayList<FCRequest> loadRequestsList() {
+    private static ThreadLocal<FCRequest[]> tlReq = new ThreadLocal<FCRequest[]>() {
+        @Override
+        protected FCRequest[] initialValue() {
+            return new FCRequest[fc.FC.MAX_THREADS + 1];
+        }
+    };
+
+    public FCRequest[] loadRequests() {
         int end = length;
-        ArrayList<FCRequest> requests = new ArrayList<>();
+        FCRequest[] requests = tlReq.get();
+        int j = 0;
         for (int i = 0; i < end; i++) {
             FCRequest request = this.requests.get(i);
             if (request != null && request.holdsRequest()) {
-                requests.add(request);
+                requests[j++] = request;
             }
         }
+        requests[j] = null;
         return requests;
-    }
-
-    public FCRequest[] loadRequests() {
-        ArrayList<FCRequest> requests = loadRequestsList();
-        return requests.toArray(new FCRequest[0]);
     }
 
     public void cleanup() {

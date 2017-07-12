@@ -164,7 +164,7 @@ public class FCHalfParallelHeap implements Heap {
                 for (int t = 0; t < TRIES; t++) {
                     FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
 
-                    if (requests.length == 0) {
+                    if (requests[0] == null) {
                         fc.cleanup();
                         break;
                     }
@@ -174,7 +174,11 @@ public class FCHalfParallelHeap implements Heap {
                         int search = 0;
 
                         for (int i = 0; i < requests.length; i++) {
-                            if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
+                            FCRequest r = requests[i];
+                            if (r == null) {
+                                break;
+                            }
+                            if (((Request) r).type == OperationType.DELETE_MIN) {
                                 search = i;
                                 break;
                             }
@@ -186,14 +190,20 @@ public class FCHalfParallelHeap implements Heap {
                     loadedRequests = null;
 
                     int deleteSize = 0;
+                    int length = requests.length;
                     for (int i = 0; i < requests.length; i++) {
-                        deleteSize += ((Request) requests[i]).type == OperationType.DELETE_MIN ? 1 : 0;
+                        FCRequest r = requests[i];
+                        if (r == null) {
+                            length = i;
+                            break;
+                        }
+                        deleteSize += ((Request) r).type == OperationType.DELETE_MIN ? 1 : 0;
                     }
 
                     Request[] deleteRequests = new Request[deleteSize];
-                    Request[] insertRequests = new Request[requests.length - deleteSize];
+                    Request[] insertRequests = new Request[length - deleteSize];
                     deleteSize = 0;
-                    for (int i = 0; i < requests.length; i++) {
+                    for (int i = 0; i < length; i++) {
                         if (((Request) requests[i]).type == OperationType.DELETE_MIN) {
                             deleteRequests[deleteSize++] = (Request) requests[i];
                         } else {
