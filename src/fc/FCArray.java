@@ -52,16 +52,11 @@ public class FCArray {
         }
     }
 
-    private static ThreadLocal<FCRequest[]> tlReq = new ThreadLocal<FCRequest[]>() {
-        @Override
-        protected FCRequest[] initialValue() {
-            return new FCRequest[fc.FC.MAX_THREADS + 1];
-        }
-    };
+    private final FCRequest[] tlReq =  new FCRequest[fc.FC.MAX_THREADS + 1];
 
     public FCRequest[] loadRequests() {
         int end = length;
-        FCRequest[] requests = tlReq.get();
+        FCRequest[] requests = tlReq;
         int j = 0;
         for (int i = 0; i < end; i++) {
             FCRequest request = this.requests.get(i);
