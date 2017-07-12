@@ -64,16 +64,11 @@ public class FC {
         return requests;
     }
 
-    private static ThreadLocal<FCRequest[]> tlReq = new ThreadLocal<FCRequest[]>() {
-        @Override
-        protected FCRequest[] initialValue() {
-            return new FCRequest[MAX_THREADS + 1];
-        }
-    };
+    private static final FCRequest[] tlReq = new FCRequest[MAX_THREADS + 1];
 
     public FCRequest[] loadRequests() {
         FCRequest tail = this.top;
-        FCRequest[] requests = tlReq.get();
+        FCRequest[] requests = tlReq;
         int i = 0;
         while (tail != DUMMY) {
             if (tail.holdsRequest()) {
