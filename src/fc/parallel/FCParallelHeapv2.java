@@ -404,7 +404,7 @@ public class FCParallelHeapv2 implements Heap {
     volatile FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
-//        BlackHole.consumeCPU(100);
+        BlackHole.consumeCPU(300);
     }
 
     public class InnerHeap {
