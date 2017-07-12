@@ -454,7 +454,7 @@ public class FCParallelHeapR1 implements Heap {
                 for (int t = 0; t < TRIES; t++) {
                     FCArray.FCRequest[] requests = loadedRequests == null ? fc.loadRequests() : loadedRequests;
 
-                    if (requests.length == 0) {
+                    if (requests[0] == null) {
                         fc.cleanup();
                         break;
                     }
@@ -464,7 +464,11 @@ public class FCParallelHeapR1 implements Heap {
                         int search = 0;
 
                         for (int i = 0; i < requests.length; i++) {
-                            if (((Request) requests[i]).type == true) {
+                            Request r = (Request) requests[i];
+                            if (r == null) {
+                                break;
+                            }
+                            if (((Request) r).type == true) {
                                 search = i;
                                 break;
                             }
@@ -479,10 +483,14 @@ public class FCParallelHeapR1 implements Heap {
                     int insertSizeF = 0;
                     for (int i = 0; i < requests.length; i++) {
 //                        assert requests[i].holdsRequest();
-                        if (((Request) requests[i]).type == false) {
-                            deleteRequests[deleteSizeF++] = (Request) requests[i];
+                        Request r = (Request) requests[i];
+                        if (r == null) {
+                            break;
+                        }
+                        if (r.type == false) {
+                            deleteRequests[deleteSizeF++] = r;
                         } else {
-                            insertRequests[insertSizeF++] = (Request) requests[i];
+                            insertRequests[insertSizeF++] = r;
                         }
                     }
 
