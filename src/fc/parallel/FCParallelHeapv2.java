@@ -23,7 +23,7 @@ public class FCParallelHeapv2 implements Heap {
         return request;
     }
 
-    private volatile boolean leaderExists;
+    private boolean leaderExists;
     private final int TRIES;
     private final int THRESHOLD;
 
@@ -403,7 +403,7 @@ public class FCParallelHeapv2 implements Heap {
         request.status = FINISHED;
     }
 
-    volatile FCArray.FCRequest[] loadedRequests;
+    FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
         BlackHole.consumeCPU(300);
@@ -460,15 +460,22 @@ public class FCParallelHeapv2 implements Heap {
 
     public void handleRequest(Request request) {
         fc.addRequest(request);
-        while (request.leader || request.holdsRequest()) {
+        while (true) {
+            boolean isLeader = request.leader;
+            int currentStatus = request.status;
+
+            if (!(isLeader || currentStatus != FINISHED)) { // request.leader || request.holdsRequest()
+                break;
+            }
+
             if (!leaderExists) {
                 if (fc.tryLock()) {
                     leaderExists = true;
-                    request.leader = true;
+                    isLeader = request.leader = true;
                 }
             }
 
-            if (request.leader && request.status == PUSHED) {
+            if (isLeader && currentStatus == PUSHED) {
 //                    (request.status == 0 || request.status == 3)) { // I'm the leader
                 fc.addRequest(request);
 
@@ -663,8 +670,8 @@ public class FCParallelHeapv2 implements Heap {
                 } // TRIES
 
 //                leaderInTransition = false;
-                request.leader = false;
                 leaderExists = false;
+                request.leader = false;
                 fc.unlock();
             } else {
                 while (request.status == PUSHED && !request.leader && leaderExists) {
