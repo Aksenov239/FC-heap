@@ -79,7 +79,7 @@ public class FCParallelHeapFlushv2 implements Heap {
         }
 
         int status;
-        volatile boolean leader;
+        boolean leader;
 
         public boolean holdsRequest() {
             return status != FINISHED;
@@ -486,6 +486,7 @@ public class FCParallelHeapFlushv2 implements Heap {
     public void handleRequest(Request request) {
         fc.addRequest(request);
         while (true) {
+            unsafe.loadFence();
             boolean isLeader = request.leader;
             int currentStatus = request.status;
 
@@ -497,6 +498,7 @@ public class FCParallelHeapFlushv2 implements Heap {
                 if (fc.tryLock()) {
                     leaderExists = true;
                     isLeader = request.leader = true;
+                    unsafe.storeFence();
                 }
             }
 
@@ -529,6 +531,8 @@ public class FCParallelHeapFlushv2 implements Heap {
                         }
                         loadedRequests = requests;
                         ((Request) requests[search]).leader = true;
+
+                        unsafe.storeFence();
                         return;
                     }
                     loadedRequests = null;
@@ -706,7 +710,7 @@ public class FCParallelHeapFlushv2 implements Heap {
 
 //                leaderInTransition = false;
                 leaderExists = false;
-                request.leader = false;
+                request.leader = false; // No need to fence, because unlock do this
                 fc.unlock();
             } else {
                 unsafe.loadFence();
