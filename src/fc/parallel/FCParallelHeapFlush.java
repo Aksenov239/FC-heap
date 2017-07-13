@@ -3,7 +3,9 @@ package fc.parallel;
 import abstractions.Heap;
 import fc.FCArray;
 import org.openjdk.jmh.logic.BlackHole;
+import sun.misc.Unsafe;
 
+import java.lang.reflect.Constructor;
 import java.util.Arrays;
 
 /**
@@ -23,7 +25,18 @@ public class FCParallelHeapFlush implements Heap {
         return request;
     }
 
-    private boolean leaderExists;
+    private static final Unsafe unsafe;
+    static {
+        try {
+            Constructor<Unsafe> unsafeConstructor = Unsafe.class.getDeclaredConstructor();
+            unsafeConstructor.setAccessible(true);
+            unsafe = unsafeConstructor.newInstance();
+        } catch (Exception e) {
+            throw new Error(e);
+        }
+    }
+
+            private boolean leaderExists;
     private final int TRIES;
     private final int THRESHOLD;
 
@@ -80,8 +93,6 @@ public class FCParallelHeapFlush implements Heap {
         // volatile List headList;
         // volatile List insertPosition;
     }
-
-    private volatile int statusFlush;
 
     public class List {
         int value;
@@ -289,7 +300,7 @@ public class FCParallelHeapFlush implements Heap {
 
         volatile boolean underProcessing;
 
-        volatile InsertInfo insertInfo; // Wake up thread to work on the right child
+        InsertInfo insertInfo; // Wake up thread to work on the right child
 
         public Node(int v) {
             this.v = v;
@@ -331,7 +342,6 @@ public class FCParallelHeapFlush implements Heap {
         int current = request.siftStart;
         if (current == 0) {
             request.status = FINISHED;
-            statusFlush = 1 - statusFlush;
             return;
         }
         final int to = heapSize >> 1;
@@ -370,7 +380,8 @@ public class FCParallelHeapFlush implements Heap {
     public void insert(Request request) {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
-        while (heap[current].insertInfo == null) {
+        while (current != 1 && heap[current >> 1].underProcessing) {
+            // I'm not in the root and the parent has not split yet
             sleep();
         } // Wait for someone to wake up us
 
@@ -404,7 +415,7 @@ public class FCParallelHeapFlush implements Heap {
 //        assert insertInfo.lneed <= current && current < insertInfo.rneed;
         heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
         request.status = FINISHED;
-        statusFlush = 1 - statusFlush;
+        unsafe.storeFence();
     }
 
     FCArray.FCRequest[] loadedRequests;
@@ -491,6 +502,7 @@ public class FCParallelHeapFlush implements Heap {
                         break;
                     }
 
+                    unsafe.loadFence();
                     if (request.status == FINISHED) {
                         request.leader = false;
                         int search = 0;
@@ -604,7 +616,7 @@ public class FCParallelHeapFlush implements Heap {
                             deleteRequests[i].status = SIFT_DELETE;
                         }
 
-                        statusFlush = 1 - statusFlush;
+                        unsafe.storeFence();
 
                         if (request.status == SIFT_DELETE) { // I have to delete too
                             siftDown(request);
@@ -612,6 +624,7 @@ public class FCParallelHeapFlush implements Heap {
                         for (int i = 0; i < deleteSize; i++) { // Wait for everybody to finish
                             while (deleteRequests[i].status == SIFT_DELETE) {
                                 sleep();
+                                unsafe.loadFence();
                             }
                         }
                     }
@@ -654,7 +667,7 @@ public class FCParallelHeapFlush implements Heap {
                             insertRequests[i].status = SIFT_INSERT;
                         }
 
-                        statusFlush = 1 - statusFlush;
+                        unsafe.storeFence();
 
                         heapSize = heapSize + orderedValuesLength;
 
@@ -664,6 +677,7 @@ public class FCParallelHeapFlush implements Heap {
                         for (int i = insertStart; i < insertSize; i++) {
                             while (insertRequests[i].status == SIFT_INSERT) {
                                 sleep();
+                                unsafe.loadFence();
                             } // wait while finish
                         }
                     }
@@ -683,16 +697,19 @@ public class FCParallelHeapFlush implements Heap {
                 request.leader = false;
                 fc.unlock();
             } else {
-                while (request.status == PUSHED && !request.leader && leaderExists) {
+                currentStatus = request.status;
+                while ((currentStatus = request.status) == PUSHED &&
+                        !request.leader && leaderExists) {
 //                    fc.addRequest(request);
+                    unsafe.loadFence();
                     sleep();
                 }
-                if (request.status == PUSHED) { // Someone set me as a leader or leader does not exist
+                if (currentStatus == PUSHED) { // Someone set me as a leader or leader does not exist
                     continue;
                 }
-                if (request.status == SIFT_DELETE) { // should know the node for sift down
+                if (currentStatus == SIFT_DELETE) { // should know the node for sift down
                     siftDown(request);
-                } else if (request.status == SIFT_INSERT) { // I should make a sift up
+                } else if (currentStatus == SIFT_INSERT) { // I should make a sift up
                     insert(request);
                 }
                 return;
