@@ -675,16 +675,16 @@ public class FCParallelHeapv2 implements Heap {
                 request.leader = false;
                 fc.unlock();
             } else {
-                while (request.status == PUSHED && !request.leader && leaderExists) {
+                while ((currentStatus = request.status) == PUSHED && !request.leader && leaderExists) {
 //                    fc.addRequest(request);
                     sleep();
                 }
-                if (request.status == PUSHED) { // Someone set me as a leader or leader does not exist
+                if (currentStatus == PUSHED) { // Someone set me as a leader or leader does not exist
                     continue;
                 }
-                if (request.status == SIFT_DELETE) { // should know the node for sift down
+                if (currentStatus == SIFT_DELETE) { // should know the node for sift down
                     siftDown(request);
-                } else if (request.status == SIFT_INSERT) { // I should make a sift up
+                } else if (currentStatus == SIFT_INSERT) { // I should make a sift up
                     insert(request);
                 }
                 return;
