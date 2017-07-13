@@ -1,13 +1,10 @@
 package fc.parallel;
 
 import abstractions.Heap;
-import fc.FC;
 import fc.FCArray;
-import fc.FCRequest;
 import org.openjdk.jmh.logic.BlackHole;
 
 import java.util.Arrays;
-import java.util.PriorityQueue;
 
 /**
  * Created by vaksenov on 24.03.2017.
@@ -41,17 +38,22 @@ public class FCParallelHeapv2 implements Heap {
 //        FINISHED -> 3         
 //    }
 
+    private static final int PUSHED = 0;
+    private static final int SIFT_DELETE = 1;
+    private static final int SIFT_INSERT = 2;
+    private static final int FINISHED = 3;
+
     public class Request extends FCArray.FCRequest implements Comparable<Request> {
         boolean type;
         int v;
 
         public Request() {
-            status = 0;
+            status = PUSHED;
         }
 
         public void set(boolean operationType) {
             this.type = operationType;
-            status = 0;
+            status = PUSHED;
         }
 
         public void set(boolean operationType, int value) {
@@ -67,7 +69,7 @@ public class FCParallelHeapv2 implements Heap {
         volatile boolean leader;
 
         public boolean holdsRequest() {
-            return status != 3;
+            return status != FINISHED;
         }
 
         // Information for sift
@@ -326,7 +328,7 @@ public class FCParallelHeapv2 implements Heap {
     public void siftDown(Request request) {
         int current = request.siftStart;
         if (current == 0) {
-            request.status = 3;
+            request.status = FINISHED;
             return;
         }
         final int to = heapSize >> 1;
@@ -346,7 +348,7 @@ public class FCParallelHeapv2 implements Heap {
 
             if (heap[current].v <= heap[swap].v) { // I'm better than children and could finish
                 heap[current].underProcessing = false;
-                request.status = 3;
+                request.status = FINISHED;
                 return;
             }
 
@@ -359,7 +361,7 @@ public class FCParallelHeapv2 implements Heap {
             current = swap;
         }
         heap[current].underProcessing = false;
-        request.status = 3;
+        request.status = FINISHED;
     }
 
     public void insert(Request request) {
@@ -398,7 +400,7 @@ public class FCParallelHeapv2 implements Heap {
         }
 //        assert insertInfo.lneed <= current && current < insertInfo.rneed;
         heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
-        request.status = 3;
+        request.status = FINISHED;
     }
 
     volatile FCArray.FCRequest[] loadedRequests;
@@ -466,7 +468,7 @@ public class FCParallelHeapv2 implements Heap {
                 }
             }
 
-            if (request.leader && request.status == 0) {
+            if (request.leader && request.status == PUSHED) {
 //                    (request.status == 0 || request.status == 3)) { // I'm the leader
                 fc.addRequest(request);
 
@@ -478,7 +480,7 @@ public class FCParallelHeapv2 implements Heap {
                         break;
                     }
 
-                    if (request.status == 3) {
+                    if (request.status == FINISHED) {
                         request.leader = false;
                         int search = 0;
 
@@ -588,13 +590,13 @@ public class FCParallelHeapv2 implements Heap {
                             deleteRequests[i].siftStart = node;
                         }
                         for (int i = 0; i < deleteSize; i++) {
-                            deleteRequests[i].status = 1;
+                            deleteRequests[i].status = SIFT_DELETE;
                         }
-                        if (request.status == 1) { // I have to delete too
+                        if (request.status == SIFT_DELETE) { // I have to delete too
                             siftDown(request);
                         }
                         for (int i = 0; i < deleteSize; i++) { // Wait for everybody to finish
-                            while (deleteRequests[i].status == 1) {
+                            while (deleteRequests[i].status == SIFT_DELETE) {
                                 sleep();
                             }
                         }
@@ -628,24 +630,23 @@ public class FCParallelHeapv2 implements Heap {
                                 lca = ~(left ^ right); // lca of i-th and (i-1)-th
                                 lca = (i + heapSize) / Integer.lowestOneBit(lca);
                             }
-
-//                            System.err.println("LCA: " + lca + " " + left + " " + right);
+//                      System.err.println("LCA: " + lca + " " + left + " " + right);
 
                             heap[lca].underProcessing = true;
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
 
                         for (int i = insertStart; i < insertSize; i++) {
-                            insertRequests[i].status = 2;
+                            insertRequests[i].status = SIFT_INSERT;
                         }
 
                         heapSize = heapSize + orderedValuesLength;
 
-                        if (request.status == 2) {
+                        if (request.status == SIFT_INSERT) {
                             insert(request);
                         }
                         for (int i = insertStart; i < insertSize; i++) {
-                            while (insertRequests[i].status == 2) {
+                            while (insertRequests[i].status == SIFT_INSERT) {
                                 sleep();
                             } // wait while finish
                         }
@@ -659,23 +660,23 @@ public class FCParallelHeapv2 implements Heap {
 //                        leaderInTransition = false;
 //                        return;
 //                    }
-                }
+                } // TRIES
 
 //                leaderInTransition = false;
                 request.leader = false;
                 leaderExists = false;
                 fc.unlock();
             } else {
-                while (request.status == 0 && !request.leader && leaderExists) {
-                    fc.addRequest(request);
+                while (request.status == PUSHED && !request.leader && leaderExists) {
+//                    fc.addRequest(request);
                     sleep();
                 }
-                if (request.status == 0) { // Someone set me as a leader or leader does not exist
+                if (request.status == PUSHED) { // Someone set me as a leader or leader does not exist
                     continue;
                 }
-                if (request.status == 1) { // should know the node for sift down
+                if (request.status == SIFT_DELETE) { // should know the node for sift down
                     siftDown(request);
-                } else if (request.status == 2) { // I should make a sift up
+                } else if (request.status == SIFT_INSERT) { // I should make a sift up
                     insert(request);
                 }
                 return;

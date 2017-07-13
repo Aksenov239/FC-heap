@@ -52,7 +52,7 @@ public class FCArray {
         }
     }
 
-    private final FCRequest[] tlReq =  new FCRequest[fc.FC.MAX_THREADS + 1];
+    private final FCRequest[] tlReq = new FCRequest[fc.FC.MAX_THREADS + 1];
 
     public FCRequest[] loadRequests() {
         int end = length;
