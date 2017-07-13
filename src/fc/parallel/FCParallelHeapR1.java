@@ -468,7 +468,7 @@ public class FCParallelHeapR1 implements Heap {
                             if (r == null) {
                                 break;
                             }
-                            if (((Request) r).type == true) {
+                            if (r.type == true) {
                                 search = i;
                                 break;
                             }

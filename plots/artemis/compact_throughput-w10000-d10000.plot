@@ -220,7 +220,7 @@
      \ref{plots:fcparallelv2}& FC Parallel v2&[5pt]
      \ref{plots:fcbinary}& FC Binary \\
      \ref{plots:fcpairing}& FC Pairing &[5pt]
-%     \ref{plots:lazyskiplist}& Lazy Skip-List &[5pt]
+     \ref{plots:lazyskiplist}& Lazy Skip-List &[5pt]
      \ref{plots:lazyskiplist}& Lock-free Skip-List \\
      \ref{plots:blocking}& Blocking\\
   };

@@ -287,7 +287,7 @@ public class FCParallelHeapv2 implements Heap {
 
         volatile boolean underProcessing;
 
-        volatile InsertInfo insertInfo; // Wake up thread to work on the right child
+        InsertInfo insertInfo; // Wake up thread to work on the right child
 
         public Node(int v) {
             this.v = v;
@@ -367,7 +367,8 @@ public class FCParallelHeapv2 implements Heap {
     public void insert(Request request) {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
-        while (heap[current].insertInfo == null) {
+        while (current != 1 && heap[current >> 1].underProcessing) {
+            // I'm not in the root and the parent has not split yet
             sleep();
         } // Wait for someone to wake up us
 
