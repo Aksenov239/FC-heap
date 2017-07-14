@@ -388,12 +388,14 @@ public class FCParallelHeapFlush implements Heap {
     public void insert(Request request) {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
-        unsafe.loadFence();
-        while (current != 1 && heap[current >> 1].underProcessing) {
-            // I'm not in the root and the parent has not split yet
-            sleep();
+        if (current != 1) {
             unsafe.loadFence();
-        } // Wait for someone to wake up us
+            while (heap[current >> 1].underProcessing) {
+                // I'm not in the root and the parent has not split yet
+                sleep();
+                unsafe.loadFence();
+            } // Wait for someone to wake up us
+        }
 
         InsertInfo insertInfo = heap[current].insertInfo;
         heap[current].insertInfo = null;
