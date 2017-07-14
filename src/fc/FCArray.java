@@ -1,5 +1,8 @@
 package fc;
 
+import sun.misc.Unsafe;
+
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -8,6 +11,18 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
  * Created by vaksenov on 16.01.2017.
  */
 public class FCArray {
+
+    private static final Unsafe unsafe;
+    static {
+        try {
+            Constructor<Unsafe> unsafeConstructor = Unsafe.class.getDeclaredConstructor();
+            unsafeConstructor.setAccessible(true);
+            unsafe = unsafeConstructor.newInstance();
+        } catch (Exception e) {
+            throw new Error(e);
+        }
+    }
+
     public static abstract class FCRequest {
         int pos = -1;
 
@@ -22,10 +37,10 @@ public class FCArray {
             AtomicIntegerFieldUpdater.newUpdater(FCArray.class, "length");
     volatile int length;
 
-    private final AtomicReferenceArray<FCRequest> requests;
+    private final FCRequest[] requests;
 
     public FCArray(int threads) {
-        requests = new AtomicReferenceArray<>(threads);
+        requests = new FCRequest[threads];
         length = 0;
     }
 
@@ -48,18 +63,20 @@ public class FCArray {
 
         if (request.pos == -1) {
             request.pos = lengthUpdater.getAndIncrement(this);
-            requests.set(request.pos, request);
+            requests[request.pos] = request;
+            unsafe.storeFence();
         }
     }
 
     private static final FCRequest[] tlReq = new FCRequest[fc.FC.MAX_THREADS + 1];
 
     public FCRequest[] loadRequests() {
+        unsafe.loadFence();
         int end = length;
         FCRequest[] requests = tlReq;
         int j = 0;
         for (int i = 0; i < end; i++) {
-            FCRequest request = this.requests.get(i);
+            FCRequest request = requests[i];
             if (request != null && request.holdsRequest()) {
                 requests[j++] = request;
             }
