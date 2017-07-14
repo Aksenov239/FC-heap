@@ -11,7 +11,7 @@ import java.util.Arrays;
 /**
  * Created by vaksenov on 24.03.2017.
  */
-public class FCParallelHeapFlushv2 implements Heap {
+public class FCParallelHeapFlush implements Heap {
     private FCArray fc;
     private int threads;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<Request>();
@@ -36,7 +36,7 @@ public class FCParallelHeapFlushv2 implements Heap {
         }
     }
 
-            private boolean leaderExists;
+    private boolean leaderExists;
     private final int TRIES;
     private final int THRESHOLD;
 
@@ -737,6 +737,7 @@ public class FCParallelHeapFlushv2 implements Heap {
 //        System.err.println("Delete min");
         Request request = getLocalRequest();
         request.set(false, -1); // I assume that the insert value for delete min is -1
+        unsafe.storeFence();
         handleRequest(request);
         return request.v;
     }
@@ -745,6 +746,7 @@ public class FCParallelHeapFlushv2 implements Heap {
 //        System.err.println("Insert " + v);
         Request request = getLocalRequest();
         request.set(true, v); // I assume that the inserted values are >= 0
+        unsafe.storeFence();
         handleRequest(request);
     }
 
