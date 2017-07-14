@@ -11,7 +11,7 @@ import java.util.Arrays;
 /**
  * Created by vaksenov on 24.03.2017.
  */
-public class FCParallelHeapFlush implements Heap {
+public class FCParallelHeapFlushv2 implements Heap {
     private FCArray fc;
     private int threads;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<Request>();
@@ -79,7 +79,7 @@ public class FCParallelHeapFlush implements Heap {
         }
 
         int status;
-        volatile boolean leader;
+        boolean leader;
 
         public boolean holdsRequest() {
             return status != FINISHED;
@@ -298,7 +298,7 @@ public class FCParallelHeapFlush implements Heap {
     public class Node {
         int v;
 
-        volatile boolean underProcessing;
+        boolean underProcessing;
 
         InsertInfo insertInfo; // Wake up thread to work on the right child
 
@@ -316,7 +316,7 @@ public class FCParallelHeapFlush implements Heap {
     final private int[] kbest;
     final private List[] orderedValues;
 
-    public FCParallelHeapFlush(int size, int numThreads) {
+    public FCParallelHeapFlushv2(int size, int numThreads) {
         fc = new FCArray(numThreads);
         threads = numThreads;
         size = Integer.highestOneBit(size) * 4;
@@ -347,13 +347,17 @@ public class FCParallelHeapFlush implements Heap {
         final int to = heapSize >> 1;
         while (current <= to) { // While there exists at least one child in heap
             final int leftChild = current << 1;
+            unsafe.loadFence();
             while (heap[leftChild].underProcessing) {
                 sleep();
+                unsafe.loadFence();
             }
             final int rightChild = leftChild + 1;
             if (rightChild <= heapSize) {
+                unsafe.loadFence();
                 while (heap[rightChild].underProcessing) {
                     sleep();
+                    unsafe.loadFence();
                 }
             }
 
@@ -362,6 +366,7 @@ public class FCParallelHeapFlush implements Heap {
             if (heap[current].v <= heap[swap].v) { // I'm better than children and could finish
                 request.status = FINISHED;
                 heap[current].underProcessing = false;
+                unsafe.storeFence();
                 return;
             }
 
@@ -372,17 +377,21 @@ public class FCParallelHeapFlush implements Heap {
 
             heap[current].underProcessing = false;
             current = swap;
+            unsafe.storeFence();
         }
         request.status = FINISHED;
         heap[current].underProcessing = false;
+        unsafe.storeFence();
     }
 
     public void insert(Request request) {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
+        unsafe.loadFence();
         while (current != 1 && heap[current >> 1].underProcessing) {
             // I'm not in the root and the parent has not split yet
             sleep();
+            unsafe.loadFence();
         } // Wait for someone to wake up us
 
         InsertInfo insertInfo = heap[current].insertInfo;
@@ -397,6 +406,7 @@ public class FCParallelHeapFlush implements Heap {
                 toRight.slideToRight();
                 heap[(current << 1) + 1].insertInfo = toRight; // Give info to the right child
                 heap[current].underProcessing = false;
+                unsafe.storeFence();
 
                 insertInfo.slideToLeft();
                 current = current << 1;
@@ -476,6 +486,7 @@ public class FCParallelHeapFlush implements Heap {
     public void handleRequest(Request request) {
         fc.addRequest(request);
         while (true) {
+            unsafe.loadFence();
             boolean isLeader = request.leader;
             int currentStatus = request.status;
 
@@ -487,6 +498,7 @@ public class FCParallelHeapFlush implements Heap {
                 if (fc.tryLock()) {
                     leaderExists = true;
                     isLeader = request.leader = true;
+                    unsafe.storeFence();
                 }
             }
 
@@ -519,6 +531,8 @@ public class FCParallelHeapFlush implements Heap {
                         }
                         loadedRequests = requests;
                         ((Request) requests[search]).leader = true;
+
+                        unsafe.storeFence();
                         return;
                     }
                     loadedRequests = null;
@@ -622,6 +636,7 @@ public class FCParallelHeapFlush implements Heap {
                             siftDown(request);
                         }
                         for (int i = 0; i < deleteSize; i++) { // Wait for everybody to finish
+                            unsafe.loadFence();
                             while (deleteRequests[i].status == SIFT_DELETE) {
                                 sleep();
                                 unsafe.loadFence();
@@ -675,6 +690,7 @@ public class FCParallelHeapFlush implements Heap {
                             insert(request);
                         }
                         for (int i = insertStart; i < insertSize; i++) {
+                            unsafe.loadFence();
                             while (insertRequests[i].status == SIFT_INSERT) {
                                 sleep();
                                 unsafe.loadFence();
@@ -694,15 +710,15 @@ public class FCParallelHeapFlush implements Heap {
 
 //                leaderInTransition = false;
                 leaderExists = false;
-                request.leader = false;
+                request.leader = false; // No need to fence, because unlock do this
                 fc.unlock();
             } else {
-                currentStatus = request.status;
+                unsafe.loadFence();
                 while ((currentStatus = request.status) == PUSHED &&
                         !request.leader && leaderExists) {
 //                    fc.addRequest(request);
-                    unsafe.loadFence();
                     sleep();
+                    unsafe.loadFence();
                 }
                 if (currentStatus == PUSHED) { // Someone set me as a leader or leader does not exist
                     continue;
