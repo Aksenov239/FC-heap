@@ -515,7 +515,7 @@ public class FCParallelHeapFlush implements Heap {
                         break;
                     }
 
-                    unsafe.loadFence();
+//                    unsafe.loadFence(); // Previous load fence did everything
                     if (request.status == FINISHED) {
                         request.leader = false;
                         int search = 0;
