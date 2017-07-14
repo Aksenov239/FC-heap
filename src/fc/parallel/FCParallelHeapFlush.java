@@ -316,7 +316,7 @@ public class FCParallelHeapFlush implements Heap {
     final private int[] kbest;
     final private List[] orderedValues;
 
-    public FCParallelHeapFlushv2(int size, int numThreads) {
+    public FCParallelHeapFlush(int size, int numThreads) {
         fc = new FCArray(numThreads);
         threads = numThreads;
         size = Integer.highestOneBit(size) * 4;
@@ -342,6 +342,7 @@ public class FCParallelHeapFlush implements Heap {
         int current = request.siftStart;
         if (current == 0) {
             request.status = FINISHED;
+            unsafe.storeFence();
             return;
         }
         final int to = heapSize >> 1;
@@ -635,11 +636,11 @@ public class FCParallelHeapFlush implements Heap {
                         if (request.status == SIFT_DELETE) { // I have to delete too
                             siftDown(request);
                         }
+                        unsafe.loadFence();
                         for (int i = 0; i < deleteSize; i++) { // Wait for everybody to finish
-                            unsafe.loadFence();
                             while (deleteRequests[i].status == SIFT_DELETE) {
                                 sleep();
-                                unsafe.loadFence();
+                                unsafe.loadFence(); // Only this load is enough, since we wait consequently
                             }
                         }
                     }
@@ -689,8 +690,8 @@ public class FCParallelHeapFlush implements Heap {
                         if (request.status == SIFT_INSERT) {
                             insert(request);
                         }
+                        unsafe.loadFence();
                         for (int i = insertStart; i < insertSize; i++) {
-                            unsafe.loadFence();
                             while (insertRequests[i].status == SIFT_INSERT) {
                                 sleep();
                                 unsafe.loadFence();
