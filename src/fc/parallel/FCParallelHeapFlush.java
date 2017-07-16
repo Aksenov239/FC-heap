@@ -397,7 +397,6 @@ public class FCParallelHeapFlush implements Heap {
             } // Wait for someone to wake up us
         }
 
-        unsafe.loadFence();
         InsertInfo insertInfo = heap[current].insertInfo;
         heap[current].insertInfo = null;
         while (!insertInfo.finished()) {
@@ -630,6 +629,9 @@ public class FCParallelHeapFlush implements Heap {
                             }
                             deleteRequests[i].siftStart = node;
                         }
+
+                        unsafe.storeFence();
+
                         for (int i = 0; i < deleteSize; i++) {
                             deleteRequests[i].status = SIFT_DELETE;
                         }
@@ -681,6 +683,8 @@ public class FCParallelHeapFlush implements Heap {
                             heap[lca].underProcessing = true;
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
+
+                        unsafe.storeFence();
 
                         for (int i = insertStart; i < insertSize; i++) {
                             insertRequests[i].status = SIFT_INSERT;
