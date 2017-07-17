@@ -1,13 +1,13 @@
 package fc.parallel;
 
 import abstractions.Heap;
-import com.sun.org.apache.bcel.internal.generic.PUSH;
 import fc.FCArray;
 import org.openjdk.jmh.logic.BlackHole;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by vaksenov on 24.03.2017.
@@ -389,14 +389,19 @@ public class FCParallelHeapFlush implements Heap {
             final int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
 
             if (heap[current].v <= heap[swap].v) { // I'm better than children and could finish
-                request.status = FINISHED;
                 heap[current].underProcessing = false;
-                unsafe.storeFence();
+
+                unsafe.loadFence();
                 if (at1) {
                     if (heap[1].underProcessing) {
-                        throw new AssertionError("Fuck");
+                        throw new AssertionError("Fuck on " + current);
                     }
                 }
+
+                request.status = FINISHED; // Ar first update the flag and then finish. Otherwise, we could
+                                           // see the new underProcessing flag
+                unsafe.storeFence();
+
                 return;
             }
 
@@ -408,16 +413,25 @@ public class FCParallelHeapFlush implements Heap {
             heap[current].underProcessing = false;
             current = swap;
             unsafe.storeFence();
-        }
-        request.status = FINISHED;
-        heap[current].underProcessing = false;
-        unsafe.storeFence();
 
-        if (at1) {
-            if (heap[1].underProcessing) {
-                throw new AssertionError("Fuck");
+            if (at1) {
+                if (heap[1].underProcessing) {
+                    throw new AssertionError("Fuck on " + current);
+                }
             }
         }
+
+        heap[current].underProcessing = false;
+
+        unsafe.loadFence();
+        if (at1) {
+            if (heap[1].underProcessing) {
+                throw new AssertionError("Fuck on " + current);
+            }
+        }
+
+        request.status = FINISHED;
+        unsafe.storeFence();
     }
 
     public void insert(Request request) {
@@ -589,6 +603,7 @@ public class FCParallelHeapFlush implements Heap {
                             }
                         }
                         loadedRequests = requests;
+
                         ((Request) requests[search]).leader = true;
 
                         unsafe.storeFence();
@@ -686,18 +701,18 @@ public class FCParallelHeapFlush implements Heap {
                             deleteRequests[i].siftStart = node;
                         }
 
-                        boolean oneAt1 = false;
-                        for (int i = 0; i < deleteSize; i++) {
-                            oneAt1 |= deleteRequests[i].siftStart == 1;
-                        }
-
-                        if (!oneAt1) {
-                            throw new AssertionError("Fuck");
-                        }
-
-                        if (!heap[1].underProcessing) {
-                            throw new AssertionError("Fuck");
-                        }
+//                        boolean oneAt1 = false;
+//                        for (int i = 0; i < deleteSize; i++) {
+//                            oneAt1 |= deleteRequests[i].siftStart == 1;
+//                        }
+//
+//                        if (!oneAt1) {
+//                            throw new AssertionError("Fuck");
+//                        }
+//
+//                        if (!heap[1].underProcessing) {
+//                            throw new AssertionError("Fuck");
+//                        }
 
                         unsafe.storeFence();
 
