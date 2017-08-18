@@ -2,6 +2,7 @@ package fc.sequential;
 
 import abstractions.Heap;
 import fc.FC;
+import fc.FCArray;
 import fc.FCRequest;
 
 import java.util.ArrayList;
@@ -10,7 +11,7 @@ import java.util.ArrayList;
  * Created by vaksenov on 24.03.2017.
  */
 public class FCPairingHeap implements Heap {
-    private FC fc;
+    private FCArray fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
     private volatile boolean leaderExists;
     private volatile boolean leaderInTransition;
@@ -27,7 +28,7 @@ public class FCPairingHeap implements Heap {
         FINISHED
     }
 
-    public class Request extends FCRequest implements Comparable<Request> {
+    public class Request extends FCArray.FCRequest implements Comparable<Request> {
         volatile OperationType type;
         volatile int v;
 
@@ -121,13 +122,15 @@ public class FCPairingHeap implements Heap {
     }
 
     private Node heap;
+    private int threads;
 
     public FCPairingHeap(int size, int numThreads) {
-        fc = new FC();
+        fc = new FCArray(numThreads);
         size = Integer.highestOneBit(size) * 4;
         heap = null;
         TRIES = numThreads;
         THRESHOLD = (int) Math.ceil(1. * numThreads / 1.7);
+        threads = numThreads;
     }
 
     public void remove(Request request) {
@@ -154,11 +157,11 @@ public class FCPairingHeap implements Heap {
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
-                    FCRequest[] requests = fc.loadRequests();
+                    FCArray.FCRequest[] requests = fc.loadRequests();
 
                     int length = requests.length;
                     for (int i = 0; i < requests.length; i++) {
-                        FCRequest r = requests[i];
+                        FCArray.FCRequest r = requests[i];
                         if (r == null) {
                             length = i;
                             break;
@@ -212,7 +215,7 @@ public class FCPairingHeap implements Heap {
 
 
     public void clear() {
-        fc = new FC();
+        fc = new FCArray(threads);
         heap = null;
     }
 
