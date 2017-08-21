@@ -84,7 +84,6 @@ public class FCBinaryHeap implements Heap {
 
     public void remove(Request request) {
         request.v = heap[1];
-        request.status = Status.FINISHED;
         heap[1] = heap[heapSize--];
         int current = 1;
         int to = heapSize >> 1;
@@ -122,7 +121,6 @@ public class FCBinaryHeap implements Heap {
 
     public void insert(Request request) {
         int v = request.v;
-        request.status = Status.FINISHED;
         sequentialInsert(v);
     }
 
