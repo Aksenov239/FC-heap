@@ -4,12 +4,14 @@ import abstractions.Heap;
 
 import java.util.concurrent.atomic.AtomicMarkableReference;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * Created by vaksenov on 25.08.2017.
  */
 public class LindenSkipList implements Heap {
     static int randomSeed = (int) (System.currentTimeMillis()) | 0x0100;
+
     private static int randomLevel() {
         int x = randomSeed;
         x ^= x << 13;
@@ -19,19 +21,79 @@ public class LindenSkipList implements Heap {
             return 0;
         int level = 1;
         while (((x >>>= 1) & 1) != 0) ++level;
-        return Math.min(level, MAX_LEVEL-1);
+        return Math.min(level, MAX_LEVEL - 1);
+    }
+
+    public class AtomicMarkableReference {
+        private class Pair {
+            final Node reference;
+            final boolean mark;
+
+            private Pair(Node reference, boolean mark) {
+                this.reference = reference;
+                this.mark = mark;
+            }
+        }
+
+        private AtomicReferenceFieldUpdater<AtomicMarkableReference, Pair> updater =
+                AtomicReferenceFieldUpdater.newUpdater(AtomicMarkableReference.class, Pair.class, "pair");
+        private volatile Pair pair;
+
+        public AtomicMarkableReference(Node node, boolean mark) {
+            pair = new Pair(node, mark);
+        }
+
+        public Node getReference() {
+            return pair.reference;
+        }
+
+        public boolean isMarked() {
+            return pair.mark;
+        }
+
+        public void set(Node newReference, boolean newMark) {
+            Pair current = pair;
+            if (newReference != current.reference || newMark != current.mark) {
+                pair = new Pair(newReference, newMark);
+            }
+        }
+
+        public Node get(boolean[] mark) {
+            Pair current = pair;
+            mark[0] = current.mark;
+            return current.reference;
+        }
+
+        public boolean compareAndSet(Node expectedReference,
+                                     Node newReference,
+                                     boolean expectedMark,
+                                     boolean newMark) {
+            Pair current = pair;
+            return
+                    expectedReference == current.reference && expectedMark == current.mark &&
+                            ((newReference == current.reference &&
+                                    newMark == current.mark) ||
+                                    updater.compareAndSet(this, current, new Pair(newReference, newMark)));
+        }
+
+        public Node attemptMark(boolean[] d) {
+            Pair current = pair;
+            updater.compareAndSet(this, current, new Pair(current.reference, true));
+            d[0] = current.mark;
+            return current.reference;
+        }
     }
 
     public class Node {
         int key;
         volatile boolean inserting;
 
-        AtomicMarkableReference<Node> bottom;
+        AtomicMarkableReference bottom;
         AtomicReference<Node>[] next;
 
         public Node(int key, int level) {
             this.key = key;
-            bottom = new AtomicMarkableReference<>(null, false);
+            bottom = new AtomicMarkableReference(null, false);
             next = new AtomicReference[level];
             for (int i = 0; i < next.length; i++) {
                 next[i] = new AtomicReference<>(null);
@@ -114,6 +176,8 @@ public class LindenSkipList implements Heap {
         Node obshead = head.bottom.getReference();
         boolean[] d = new boolean[1];
         do {
+            offset++;
+
             Node next = x.bottom.get(d);
             if (x.inserting && newhead == null) {
                 newhead = x;
@@ -121,10 +185,14 @@ public class LindenSkipList implements Heap {
             if (next == tail || next.bottom.getReference() == tail) {
                 return -1;
             }
-            if (!d[0]) {
-                d[0] = !x.bottom.attemptMark(next, true);
+
+            if (d[0]) {
+                x = next;
+                continue;
             }
-            offset++;
+
+            next = x.bottom.attemptMark(d);
+
             x = next;
         } while (d[0]);
 
@@ -152,7 +220,7 @@ public class LindenSkipList implements Heap {
                     pred = cur;
                     cur = pred.next[i].get();
                 }
-                if (head.next[i].compareAndSet(h, pred.next[i].get())) {
+                if (head.next[i].compareAndSet(h, cur)) {
                     i--;
                 }
             }
