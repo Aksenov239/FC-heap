@@ -160,10 +160,12 @@ public class LindenSkipList implements Heap {
         } while (!preds[0].bottom.compareAndSet(succs[0], x, false, false));
         int i = 1;
         while (i < level) {
-            x.next[i].set(succs[i]);
             if (x.bottom.isMarked() || succs[i].bottom.isMarked() || succs[i] == del) {
                 break;
             }
+
+            x.next[i].set(succs[i]);
+
             if (preds[i].next[i].compareAndSet(succs[i], x)) {
                 i++;
             } else {
@@ -211,6 +213,10 @@ public class LindenSkipList implements Heap {
 
         if (newhead == null) {
             newhead = x;
+        }
+
+        if (head.bottom.getReference() != obshead) {
+            return ans;
         }
 
         if (head.bottom.compareAndSet(obshead, newhead, true, true)) {
