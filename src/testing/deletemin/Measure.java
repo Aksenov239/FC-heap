@@ -31,7 +31,7 @@ public class Measure {
     public void evaluateFor(boolean withStats) {
         prepopulate();
 
-        AtomicInteger total = new AtomicInteger(size / 2);
+        AtomicInteger total = new AtomicInteger(9 * size / 10);
 
         Thread[] thrs = new Thread[threads];
         HeapWorker[] workers = new HeapWorker[threads];
