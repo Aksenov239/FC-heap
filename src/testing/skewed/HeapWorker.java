@@ -18,23 +18,20 @@ public class HeapWorker implements Runnable {
     Heap heap;
     int range;
     int insertRation;
-    int start;
-    int dx;
+    AtomicInteger keys;
 
-    public HeapWorker(int id, Heap heap, int range, int insertRation, int start, int dx) {
+    public HeapWorker(int id, Heap heap, int range, int insertRation, AtomicInteger keys) {
         rnd = new Random(id);
         this.heap = heap;
         this.range = range;
         this.insertRation = insertRation;
-        this.start = start;
-        this.dx = dx;
+        this.keys = keys;
     }
 
     public void run() {
         while (!stop) {
             if (rnd.nextInt(100) < insertRation) {
-                heap.insert(start);
-                start -= dx;
+                heap.insert(keys.getAndDecrement());
                 numInserts++;
             } else {
                 heap.deleteMin();
