@@ -59,7 +59,7 @@ for key in keys:
             for i in range(len(benchmarks)):
                 bench = benchmarks[i]
                 out = open((directory + "comparison_{}_{}_{}_{}.dat").format(key, size, r, bench.split(".")[-1]), 'w')
-                if not os.path.exists(filename(warmup, duration, 1, size, r, bench)):
+                if not os.path.exists(filename(warmup, duration, workload, 1, size, r, bench)):
                     continue
                 for proc in procs:
                     if not os.path.exists(filename(warmup, duration, proc, size, r, bench)):
