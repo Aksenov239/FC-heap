@@ -15,18 +15,22 @@ warmup = 10000
 duration = 10000
 iterations = 5
 procs = [1, 3, 7, 14, 21, 28, 35, 42, 49, 56, 63]
-sizes = [800000, 2000000, 4000000, 8000000]
+sizes = [20000000, 800000, 2000000, 4000000, 8000000]
 ranges = [100, 10000, 2147483647]
 
 max_proc = int(sys.argv[1])
 
 benchmarks=[
 #           "fc.parallel.FCParallelHeap",
-           "fc.parallel.FCParallelHeapv2",
+#           "fc.parallel.FCParallelHeapv2",
+#           "fc.parallel.FCParallelHeapFlush",
 #           "fc.parallel.TFCParallelHeap",
 #           "fc.sequential.FCBinaryHeap",
 #           "fc.sequential.FCPairingHeap",
-#           "lockbased.BlockingHeap",
+#           "lockfree.SkipQueue",
+           "lockfree.LindenSkipList",
+           "lockbased.BlockingBinaryHeap",
+           "lockbased.BlockingPairingHeap",
 #           "lockbased.LazySkipListHeap"
          ]
 
@@ -38,7 +42,7 @@ for proc in procs:
         break
     for size in sizes:
         allranges = list(ranges)
-#        allranges.append(2 * size)
+        allranges.append(2 * size)
         for r in allranges:
             for benchmark in benchmarks:
                 out = filename(warmup, duration, proc, size, r, benchmark)
