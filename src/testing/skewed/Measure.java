@@ -3,7 +3,6 @@ package testing.skewed;
 import abstractions.Heap;
 
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by vaksenov on 30.03.2017.
@@ -21,20 +20,20 @@ public class Measure {
 
     Heap heap;
 
-    public void prepopulate(AtomicInteger start) {
+    public int prepopulate(int start) {
         for (int i = 0; i < size; i++) {
-            heap.sequentialInsert(start.getAndDecrement());
+            heap.sequentialInsert(start--);
         }
+        return start;
     }
 
     public void evaluateFor(int milliseconds, boolean withStats) {
-        AtomicInteger keys = new AtomicInteger(Integer.MAX_VALUE);
-        prepopulate(keys);
+        int keys = prepopulate(Integer.MAX_VALUE);
 
         Thread[] thrs = new Thread[threads];
         HeapWorker[] workers = new HeapWorker[threads];
         for (int i = 0; i < threads; i++) {
-            workers[i] = new HeapWorker(i, heap, range, insertRatio, keys);
+            workers[i] = new HeapWorker(i, heap, range, insertRatio, keys - i, threads);
             thrs[i] = new Thread(workers[i]);
         }
 

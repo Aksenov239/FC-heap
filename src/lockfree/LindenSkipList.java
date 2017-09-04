@@ -78,8 +78,7 @@ public class LindenSkipList implements Heap {
 
         public Node attemptMark(boolean[] d) {
             Pair current = pair;
-            updater.compareAndSet(this, current, new Pair(current.reference, true));
-            d[0] = current.mark;
+            d[0] = current.mark || !updater.compareAndSet(this, current, new Pair(current.reference, true));
             return current.reference;
         }
     }
@@ -160,10 +159,12 @@ public class LindenSkipList implements Heap {
         } while (!preds[0].bottom.compareAndSet(succs[0], x, false, false));
         int i = 1;
         while (i < level) {
-            x.next[i].set(succs[i]);
             if (x.bottom.isMarked() || succs[i].bottom.isMarked() || succs[i] == del) {
                 break;
             }
+
+            x.next[i].set(succs[i]);
+
             if (preds[i].next[i].compareAndSet(succs[i], x)) {
                 i++;
             } else {
@@ -198,9 +199,11 @@ public class LindenSkipList implements Heap {
                 continue;
             }
 
-            next = x.bottom.attemptMark(d);
+            x.bottom.attemptMark(d);
 
-            x = next;
+            if (x.bottom.isMarked()) {
+                x = x.bottom.getReference();
+            }
         } while (d[0]);
 
         int ans = x.key;
@@ -211,6 +214,10 @@ public class LindenSkipList implements Heap {
 
         if (newhead == null) {
             newhead = x;
+        }
+
+        if (head.bottom.getReference() != obshead) {
+            return ans;
         }
 
         if (head.bottom.compareAndSet(obshead, newhead, true, true)) {
