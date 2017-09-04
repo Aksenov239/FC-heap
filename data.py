@@ -62,8 +62,8 @@ for key in keys:
                 if not os.path.exists(filename(warmup, duration, workload, 1, size, r, bench)):
                     continue
                 for proc in procs:
-                    if not os.path.exists(filename(warmup, duration, proc, size, r, bench)):
+                    if not os.path.exists(filename(warmup, duration, workload, proc, size, r, bench)):
                         continue
-                    print(filename(warmup, duration, proc, size, r, bench))
-                    results = read_from_file(filename(warmup, duration, proc, size, r, bench), keys)[key][1:]
+                    print(filename(warmup, duration, workload, proc, size, r, bench))
+                    results = read_from_file(filename(warmup, duration, workload, proc, size, r, bench), keys)[key][1:]
                     out.write(str(proc) + " " + str(mean(results) / 1000 / 1000) + " " + str(stdev(results) / 1000 / 1000) + "\n")
