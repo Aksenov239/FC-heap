@@ -120,18 +120,25 @@ public class LindenSkipList implements Heap {
         Node pred = head;
         Node del = null;
         while (i >= 0) {
-            Node cur = i == 0 ? pred.bottom.getReference() : pred.next[i].get();
-            boolean d = pred.bottom.isMarked();
+            boolean[] d = new boolean[1];
+            Node cur;
+            if (i == 0) {
+                cur = pred.bottom.get(d);
+            } else {
+                cur = pred.next[i].get();
+            }
             while (cur.key < k || cur.bottom.isMarked() ||
-                    (d && i == 0)) {
-                if (d && i == 0) {
+                    (d[0] && i == 0)) {
+                if (d[0] && i == 0) {
                     del = cur;
                 }
                 pred = cur;
 
-                cur = i == 0 ? pred.bottom.getReference() : pred.next[i].get();
-
-                d = pred.bottom.isMarked();
+                if (i == 0) {
+                    cur = pred.bottom.get(d);
+                } else {
+                    cur = pred.next[i].get();
+                }
             }
             preds[i] = pred;
             succs[i] = cur;
