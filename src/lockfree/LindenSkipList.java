@@ -78,8 +78,7 @@ public class LindenSkipList implements Heap {
 
         public Node attemptMark(boolean[] d) {
             Pair current = pair;
-            updater.compareAndSet(this, current, new Pair(current.reference, true));
-            d[0] = current.mark;
+            d[0] = current.mark || !updater.compareAndSet(this, current, new Pair(current.reference, true));
             return current.reference;
         }
     }
@@ -200,9 +199,11 @@ public class LindenSkipList implements Heap {
                 continue;
             }
 
-            next = x.bottom.attemptMark(d);
+            x.bottom.attemptMark(d);
 
-            x = next;
+            if (x.bottom.isMarked()) {
+                x = x.bottom.getReference();
+            }
         } while (d[0]);
 
         int ans = x.key;
