@@ -7,6 +7,7 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by vaksenov on 24.03.2017.
@@ -83,6 +84,10 @@ public class FCParallelHeapFlush implements Heap {
 
         public boolean holdsRequest() {
             return status != FINISHED;
+        }
+
+        public boolean properStatus() {
+            return status == FINISHED || status == PUSHED;
         }
 
         // Information for sift
@@ -189,20 +194,25 @@ public class FCParallelHeapFlush implements Heap {
         private int intersectionLeft() {
             int l = lrange;
             int r = (lrange + rrange) >> 1;
-            if (Math.max(l, lneed) < Math.min(r, rneed)) { // Intersects
+            if (Math.max(l, lneed) < Math.min(r, rneed)) { // Intersects on the same level
                 return Math.min(r, rneed) - Math.max(l, lneed);
             }
-            if (2 * l < rneed) { //Probably, intersection is on next layer
-                if (l != r) { // are we on the last level
-                    l = l << 1;
-                    r = r << 1;
-                } else {
-                    l = l << 1;
-                    r = (r << 1) + 1;
-                }
-                if (Math.max(l, lneed) < Math.min(r, rneed)) {
-                    return Math.min(r, rneed) - Math.max(l, lneed);
-                }
+//            if (2 * l < rneed) { //Probably, intersection is on next layer
+//                if (l != r) { // are we on the last level
+//                    l = l << 1;
+//                    r = r << 1;
+//                } else {
+//                    l = l << 1;
+//                    r = (r << 1) + 1;
+//                }
+//                if (Math.max(l, lneed) < Math.min(r, rneed)) {
+//                    return Math.min(r, rneed) - Math.max(l, lneed);
+//                }
+//            }
+            l = 2 * l;
+            r = 2 * r;
+            if (Math.max(l, lneed) < Math.min(r, rneed)) { // Intersects on the next level
+                return Math.min(r, rneed) - Math.max(l, lneed);
             }
             return 0; // Do not intersect
         }
@@ -293,6 +303,17 @@ public class FCParallelHeapFlush implements Heap {
         public boolean finished() {
             return lrange == rrange - 1 && lneed <= lrange && lrange < rneed;
         }
+
+        public boolean proper() { // [lneed, rneed) always intersects with [lrange, rrange)
+            // Intersect on the same level
+            if (Math.max(lneed, lrange) < Math.min(rneed, rrange)) {
+                return true;
+            }
+            if (Math.max(lneed, 2 * lrange) < Math.min(rneed, 2 * rrange)) {
+                return true;
+            }
+            return false;
+        }
     }
 
     public class Node {
@@ -345,6 +366,9 @@ public class FCParallelHeapFlush implements Heap {
             unsafe.storeFence();
             return;
         }
+
+        boolean at1 = current == 1;
+
         final int to = heapSize >> 1;
         while (current <= to) { // While there exists at least one child in heap
             final int leftChild = current << 1;
@@ -365,9 +389,19 @@ public class FCParallelHeapFlush implements Heap {
             final int swap = rightChild > heapSize || heap[leftChild].v < heap[rightChild].v ? leftChild : rightChild; // With whom to swap
 
             if (heap[current].v <= heap[swap].v) { // I'm better than children and could finish
-                request.status = FINISHED;
                 heap[current].underProcessing = false;
+
                 unsafe.storeFence();
+//                if (at1) {
+//                    if (heap[1].underProcessing) {
+//                        throw new AssertionError("Fuck on " + current);
+//                    }
+//                }
+
+                request.status = FINISHED; // Ar first update the flag and then finish. Otherwise, we could
+                                           // see the new underProcessing flag
+                unsafe.storeFence();
+
                 return;
             }
 
@@ -379,37 +413,72 @@ public class FCParallelHeapFlush implements Heap {
             heap[current].underProcessing = false;
             current = swap;
             unsafe.storeFence();
+
+//            if (at1) {
+//                if (heap[1].underProcessing) {
+//                    throw new AssertionError("Fuck on " + current);
+//                }
+//            }
         }
-        request.status = FINISHED;
+
         heap[current].underProcessing = false;
+        unsafe.storeFence();
+
+//        unsafe.loadFence();
+//        if (at1) {
+//            if (heap[1].underProcessing) {
+//                throw new AssertionError("Fuck on " + current);
+//            }
+//        }
+
+        request.status = FINISHED;
         unsafe.storeFence();
     }
 
     public void insert(Request request) {
         int current = request.siftStart;
 //        System.err.println("Wait on: " + current);
-        unsafe.loadFence();
-        while (current != 1 && heap[current >> 1].underProcessing) {
-            // I'm not in the root and the parent has not split yet
-            sleep();
+        if (current != 1) {
             unsafe.loadFence();
-        } // Wait for someone to wake up us
+            while (heap[current >> 1].underProcessing) {
+                // I'm not in the root and the parent has not split yet
+                sleep();
+                unsafe.loadFence();
+            } // Wait for someone to wake up us
+        }
 
         InsertInfo insertInfo = heap[current].insertInfo;
         heap[current].insertInfo = null;
         while (!insertInfo.finished()) {
 //            System.err.println(current + " " + insertInfo.lrange + " " + insertInfo.rrange + " " + insertInfo.lneed + " " + insertInfo.rneed);
+//            if (!insertInfo.proper()) {
+//                System.err.println(current + " " + heapSize + " "
+//                        + insertInfo.lrange + " " + insertInfo.rrange + " "
+//                        + insertInfo.lneed + " " + insertInfo.rneed);
+//                System.err.println("FTF?!");
+//                System.exit(1);
+//            }
             heap[current].v = insertInfo.replaceMinFromHeap(heap[current].v); // Replace current value
             if (heap[current].underProcessing) { // Then I should split the work and give the right child new info
 //                System.err.println("Split on " + current);
 //                heap[current].underProcessing = false;
                 InsertInfo toRight = insertInfo.split();
                 toRight.slideToRight();
+//                if (!toRight.proper()) {
+//                    System.err.println(current + " " + insertInfo.lneed + " " + insertInfo.rneed + " " +
+//                            insertInfo.lrange + " " + insertInfo.rrange);
+//                    throw new RuntimeException("Fuck");
+//                }
                 heap[(current << 1) + 1].insertInfo = toRight; // Give info to the right child
                 heap[current].underProcessing = false;
                 unsafe.storeFence();
 
                 insertInfo.slideToLeft();
+//                if (!insertInfo.proper()) {
+//                    System.err.println(current + " " + insertInfo.lneed + " " + insertInfo.rneed + " " +
+//                        insertInfo.lrange + " " + insertInfo.rrange);
+//                    throw new RuntimeException("Fuck");
+//                }
                 current = current << 1;
             } else {
 //                System.err.println("Slide: " + current + " " + insertInfo.goToLeft());
@@ -420,6 +489,10 @@ public class FCParallelHeapFlush implements Heap {
                     insertInfo.slideToRight();
                     current = (current << 1) + 1;
                 }
+//                if (!insertInfo.proper()) {
+//                    throw new RuntimeException("Fuck");
+//                }
+
             }
 //            System.err.println("Current: " + current);
         }
@@ -531,6 +604,7 @@ public class FCParallelHeapFlush implements Heap {
                             }
                         }
                         loadedRequests = requests;
+
                         ((Request) requests[search]).leader = true;
 
                         unsafe.storeFence();
@@ -609,7 +683,7 @@ public class FCParallelHeapFlush implements Heap {
 
                             if (insertStart < insertSize) { // We could add insert some values right now
                                 heap[node].v = insertRequests[insertStart].v;
-                                insertRequests[insertStart++].status = 3;
+                                insertRequests[insertStart++].status = FINISHED;
                             } else {
                                 while (heap[heapSize].underProcessing) { // We should swap only with unprocessed vertices
                                     heap[heapSize].underProcessing = false;
@@ -627,6 +701,22 @@ public class FCParallelHeapFlush implements Heap {
                             }
                             deleteRequests[i].siftStart = node;
                         }
+
+//                        boolean oneAt1 = false;
+//                        for (int i = 0; i < deleteSize; i++) {
+//                            oneAt1 |= deleteRequests[i].siftStart == 1;
+//                        }
+//
+//                        if (!oneAt1) {
+//                            throw new AssertionError("Fuck");
+//                        }
+//
+//                        if (!heap[1].underProcessing) {
+//                            throw new AssertionError("Fuck");
+//                        }
+
+                        unsafe.storeFence();
+
                         for (int i = 0; i < deleteSize; i++) {
                             deleteRequests[i].status = SIFT_DELETE;
                         }
@@ -643,6 +733,11 @@ public class FCParallelHeapFlush implements Heap {
                                 unsafe.loadFence(); // Only this load is enough, since we wait consequently
                             }
                         }
+
+//                        unsafe.loadFence();
+//                        if (heap[1].underProcessing) {
+//                            throw new AssertionError("Fuck");
+//                        }
                     }
 
                     if (insertStart < insertSize) { // There are insert requests left
@@ -678,6 +773,8 @@ public class FCParallelHeapFlush implements Heap {
                             heap[lca].underProcessing = true;
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
+
+                        unsafe.storeFence();
 
                         for (int i = insertStart; i < insertSize; i++) {
                             insertRequests[i].status = SIFT_INSERT;

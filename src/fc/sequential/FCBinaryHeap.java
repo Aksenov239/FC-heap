@@ -2,7 +2,9 @@ package fc.sequential;
 
 import abstractions.Heap;
 import fc.FC;
+import fc.FCArray;
 import fc.FCRequest;
+import org.openjdk.jmh.logic.BlackHole;
 
 import java.util.Arrays;
 import java.util.PriorityQueue;
@@ -12,7 +14,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * Created by vaksenov on 24.03.2017.
  */
 public class FCBinaryHeap implements Heap {
-    private FC fc;
+    private FCArray fc;
     private ThreadLocal<Request> allocatedRequests = new ThreadLocal<>();
     private volatile boolean leaderExists;
     private volatile boolean leaderInTransition;
@@ -29,7 +31,7 @@ public class FCBinaryHeap implements Heap {
         FINISHED
     }
 
-    public class Request extends FCRequest implements Comparable<Request> {
+    public class Request extends FCArray.FCRequest implements Comparable<Request> {
         OperationType type;
         int v;
 
@@ -70,17 +72,19 @@ public class FCBinaryHeap implements Heap {
     private int[] heap;
     private int heapSize;
 
+    int threads;
+
     public FCBinaryHeap(int size, int numThreads) {
-        fc = new FC();
+        fc = new FCArray(numThreads);
         size = Integer.highestOneBit(size) * 4;
         heap = new int[size];
         TRIES = numThreads;
         THRESHOLD = (int) Math.ceil(1. * numThreads / 1.7);
+        threads = numThreads;
     }
 
     public void remove(Request request) {
         request.v = heap[1];
-        request.status = Status.FINISHED;
         heap[1] = heap[heapSize--];
         int current = 1;
         int to = heapSize >> 1;
@@ -118,11 +122,14 @@ public class FCBinaryHeap implements Heap {
 
     public void insert(Request request) {
         int v = request.v;
-        request.status = Status.FINISHED;
         sequentialInsert(v);
     }
 
     private ReentrantLock lock = new ReentrantLock();
+
+    public void sleep() {
+        BlackHole.consumeCPU(300);
+    }
 
     public void handleRequest(Request request) {
         fc.addRequest(request);
@@ -131,7 +138,7 @@ public class FCBinaryHeap implements Heap {
                 fc.addRequest(request);
 
                 for (int t = 0; t < TRIES; t++) {
-                    FCRequest[] requests = fc.loadRequests();
+                    FCArray.FCRequest[] requests = fc.loadRequests();
 
                     if (heapSize + requests.length >= heap.length) { // Increase heap size
                         int[] newHeap = new int[2 * heap.length];
@@ -143,7 +150,7 @@ public class FCBinaryHeap implements Heap {
 
                     int length = requests.length;
                     for (int i = 0; i < requests.length; i++) {
-                        FCRequest r = requests[i];
+                        FCArray.FCRequest r = requests[i];
                         if (r == null) {
                             length = i;
                             break;
@@ -165,11 +172,7 @@ public class FCBinaryHeap implements Heap {
                 return;
             } else {
                 while (request.status == Status.PUSHED && lock.isLocked()) {
-//                    try {
-//                        Thread.sleep(1);
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
+                    sleep();
                     fc.addRequest(request);
                 }
                 if (request.status == Status.FINISHED) {
@@ -194,7 +197,7 @@ public class FCBinaryHeap implements Heap {
 
 
     public void clear() {
-        fc = new FC();
+        fc = new FCArray(threads);
         for (int i = 0; i < heapSize; i++) {
             heap[i + 1] = 0;
         }
