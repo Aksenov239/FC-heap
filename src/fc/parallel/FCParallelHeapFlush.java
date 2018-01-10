@@ -58,7 +58,9 @@ public class FCParallelHeapFlush implements Heap {
     private static final int FINISHED = 3;
 
     public class Request extends FCArray.FCRequest implements Comparable<Request> {
+//        @sun.misc.Contended("init")
         boolean type;
+//        @sun.misc.Contended("init")
         int v;
 
         public Request() {
@@ -79,7 +81,9 @@ public class FCParallelHeapFlush implements Heap {
             return Integer.compare(v, request.v);
         }
 
+//        @sun.misc.Contended("status")
         int status;
+//        @sun.misc.Contended("status")
         boolean leader;
 
         public boolean holdsRequest() {
@@ -91,6 +95,7 @@ public class FCParallelHeapFlush implements Heap {
         }
 
         // Information for sift
+//        @sun.misc.Contended("result")
         int siftStart; // start position of sift down for insert and delete
 
         // Information for siftUp
@@ -123,15 +128,28 @@ public class FCParallelHeapFlush implements Heap {
     }
 
     public class InsertInfo {
+        //@sun.misc.Contended("insert_info")
         List[] orderedValues;
-        int left, right; // Begin and end of captured positions in orderedValues
+        //@sun.misc.Contended("insert_info")
+        int left;
+        //@sun.misc.Contended("insert_info")
+        int right; // Begin and end of captured positions in orderedValues
+        //@sun.misc.Contended("insert_info")
         List headFromHeap;
+        //@sun.misc.Contended("insert_info")
         List tailFromHeap;
+        //@sun.misc.Contended("insert_info")
         int listLength;
 
-        int lrange, rrange; // current range of the info, excluding rrange
+        //@sun.misc.Contended("insert_info")
+        int lrange;
+        //@sun.misc.Contended("insert_info")
+        int rrange; // current range of the info, excluding rrange
 
-        int lneed, rneed; // known range of inserted values, excluding rneed
+        //@sun.misc.Contended("insert_info")
+        int lneed;
+        //@sun.misc.Contended("insert_info")
+        int rneed; // known range of inserted values, excluding rneed
 
         public InsertInfo(List[] orderedValues, int left, int right,
                           List headFromHeap, List tailFromHeap, int listLength,
@@ -317,10 +335,13 @@ public class FCParallelHeapFlush implements Heap {
     }
 
     public class Node {
+        //@sun.misc.Contended("node")
         int v;
 
+        //@sun.misc.Contended("node")
         boolean underProcessing;
 
+        //@sun.misc.Contended("node")
         InsertInfo insertInfo; // Wake up thread to work on the right child
 
         public Node(int v) {
@@ -505,7 +526,7 @@ public class FCParallelHeapFlush implements Heap {
     FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(300);
+        BlackHole.consumeCPU(50);
     }
 
     public class InnerHeap {
