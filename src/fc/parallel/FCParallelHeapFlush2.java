@@ -778,9 +778,13 @@ public class FCParallelHeapFlush2 implements Heap {
                         }
 
                         int lstart = Integer.highestOneBit(heapSize + 1);
-                        heap[1].insertInfo = new InsertInfo(orderedValues, 0, orderedValuesLength,
+                        int idInsertInfo = 0;
+
+                        insertInfos[0].set(orderedValues, 0, orderedValuesLength,
                                 null, null, 0,
                                 lstart, 2 * lstart, heapSize + 1, heapSize + orderedValuesLength + 1);
+
+                        heap[1].insertInfo = insertInfos[idInsertInfo++];
 
                         int id = 0;
                         for (int i = 1; i < orderedValuesLength; i++) {
@@ -796,6 +800,7 @@ public class FCParallelHeapFlush2 implements Heap {
 //                      System.err.println("LCA: " + lca + " " + left + " " + right);
 
                             heap[lca].underProcessing = true;
+                            heap[2 * lca + 1].insertInfo = insertInfos[idInsertInfo++];
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
 
