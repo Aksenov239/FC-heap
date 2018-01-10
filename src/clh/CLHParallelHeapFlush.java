@@ -385,11 +385,6 @@ public class CLHParallelHeapFlush implements Heap {
                 heap[current].underProcessing = false;
 
                 unsafe.storeFence();
-//                if (at1) {
-//                    if (heap[1].underProcessing) {
-//                        throw new AssertionError("Fuck on " + current);
-//                    }
-//                }
 
                 request.status = FINISHED; // Ar first update the flag and then finish. Otherwise, we could
                 // see the new underProcessing flag
@@ -399,15 +394,16 @@ public class CLHParallelHeapFlush implements Heap {
             }
 
             heap[swap].underProcessing = true;
-            // unsafe.storeFence(); // Probably need fence here
+            unsafe.storeFence(); // Probably need fence here
+
+            heap[current].underProcessing = false;
+            unsafe.storeFence();
+
             int tmp = heap[current].v;
             heap[current].v = heap[swap].v;
             heap[swap].v = tmp;
 
-            heap[current].underProcessing = false;
             current = swap;
-            unsafe.storeFence();
-
 //            if (at1) {
 //                if (heap[1].underProcessing) {
 //                    throw new AssertionError("Fuck on " + current);
@@ -464,6 +460,7 @@ public class CLHParallelHeapFlush implements Heap {
 //                    throw new RuntimeException("Fuck");
 //                }
                 heap[(current << 1) + 1].insertInfo = toRight; // Give info to the right child
+                unsafe.storeFence();
                 heap[current].underProcessing = false;
                 unsafe.storeFence();
 
@@ -492,6 +489,7 @@ public class CLHParallelHeapFlush implements Heap {
         }
 //        assert insertInfo.lneed <= current && current < insertInfo.rneed;
         heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
+        unsafe.storeFence();
         request.status = FINISHED;
         unsafe.storeFence();
     }
