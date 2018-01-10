@@ -526,7 +526,7 @@ public class FCParallelHeapFlush implements Heap {
     FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(50);
+        BlackHole.consumeCPU(300);
     }
 
     public class InnerHeap {
