@@ -795,7 +795,7 @@ public class CLHParallelHeapFlush implements Heap {
     public void clear() {
         fc = new FCCLH(threads);
         allocatedRequests = new ThreadLocal<>();
-        for (int i = 0; i < heapSize; i++) {
+        for (int i = 0; i + 1 < heap.length && heap[i + 1] != null; i++) {
             heap[i + 1].v = Integer.MAX_VALUE;
         }
         heapSize = 0;
