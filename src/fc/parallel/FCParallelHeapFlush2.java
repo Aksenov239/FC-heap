@@ -247,6 +247,7 @@ public class FCParallelHeapFlush2 implements Heap {
                 headFromHeap = null;
                 tailFromHeap = null;
                 listLength = 0;
+                return;
             }
             int toRight = right - left + listLength - toLeft;
             if (right - left >= toRight) { // We give to new part of array
@@ -257,6 +258,7 @@ public class FCParallelHeapFlush2 implements Heap {
                 if (left == right) {
                     orderedValues = null;
                 }
+                return;
             }
             // Split list
             if (toLeft < toRight) {
@@ -272,6 +274,7 @@ public class FCParallelHeapFlush2 implements Heap {
                 listLength = toLeft - (right - left);
 //                assert headFromHeap.length() == listLength;
 //                assert insertInfo.headFromHeap.length() == toRight;
+                return;
             } else {
                 List splitPosition = headFromHeap;
                 for (int i = 0; i < toRight - (right - left) - 1; i++) {
@@ -285,6 +288,7 @@ public class FCParallelHeapFlush2 implements Heap {
                 headFromHeap = splitPosition.next;
                 listLength = toLeft;
                 splitPosition.next = null;
+                return;
             }
         }
 
@@ -487,6 +491,7 @@ public class FCParallelHeapFlush2 implements Heap {
 //                System.err.println("Split on " + current);
 //                heap[current].underProcessing = false;
                 InsertInfo toRight = heap[(current << 1) + 1].insertInfo;
+                System.err.println(toRight);
                 insertInfo.split(toRight);
                 toRight.slideToRight();
 //                if (!toRight.proper()) {
@@ -778,13 +783,13 @@ public class FCParallelHeapFlush2 implements Heap {
                         }
 
                         int lstart = Integer.highestOneBit(heapSize + 1);
-                        int idInsertInfo = 0;
 
                         insertInfos[0].set(orderedValues, 0, orderedValuesLength,
                                 null, null, 0,
                                 lstart, 2 * lstart, heapSize + 1, heapSize + orderedValuesLength + 1);
 
-                        heap[1].insertInfo = insertInfos[idInsertInfo++];
+                        int idII = 0;
+                        heap[1].insertInfo = insertInfos[idII++];
 
                         int id = 0;
                         for (int i = 1; i < orderedValuesLength; i++) {
@@ -800,7 +805,7 @@ public class FCParallelHeapFlush2 implements Heap {
 //                      System.err.println("LCA: " + lca + " " + left + " " + right);
 
                             heap[lca].underProcessing = true;
-                            heap[2 * lca + 1].insertInfo = insertInfos[idInsertInfo++];
+                            heap[2 * lca + 1].insertInfo = insertInfos[idII++];
                             insertRequests[i + insertStart].siftStart = 2 * lca + 1; // Start sift from the right child of lca
                         }
 
