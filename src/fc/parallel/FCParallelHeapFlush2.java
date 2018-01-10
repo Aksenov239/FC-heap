@@ -845,7 +845,7 @@ public class FCParallelHeapFlush2 implements Heap {
     public void clear() {
         fc = new FCArray(threads);
         allocatedRequests = new ThreadLocal<>();
-        for (int i = 0; i < heapSize; i++) {
+        for (int i = 0; i < heap.length - 1 && heap[i + 1] != null; i++) {
             heap[i + 1].v = Integer.MAX_VALUE;
         }
         heapSize = 0;
