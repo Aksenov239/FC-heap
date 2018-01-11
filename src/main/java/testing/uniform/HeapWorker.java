@@ -37,7 +37,7 @@ public class HeapWorker implements Runnable {
                 numDeletes++;
             }
         }
-        System.err.println("Finished " + id);
+        Measure.log("Finished " + id);
     }
 
     public void stop() {

@@ -46,6 +46,10 @@ public class SkipQueue implements Heap {
         }
     }
 
+    ThreadLocal<Node[]> preds = ThreadLocal.withInitial(() -> new Node[MAX_LEVEL + 1]);
+
+    ThreadLocal<Node[]> succs = ThreadLocal.withInitial(() -> new Node[MAX_LEVEL + 1]);
+
     static final int MAX_LEVEL = 32;
     Node head;
     Node tail;
@@ -109,8 +113,8 @@ public class SkipQueue implements Heap {
      */
     boolean add(Node node) {
         int bottomLevel = 0;
-        Node[] preds = new Node[MAX_LEVEL + 1];
-        Node[] succs = new Node[MAX_LEVEL + 1];
+        Node[] preds = this.preds.get();
+        Node[] succs = this.succs.get();
         while (true) {
             boolean found = find(node, preds, succs);
             if (found) { // if found it's not marked
@@ -152,8 +156,8 @@ public class SkipQueue implements Heap {
      */
     boolean remove(Node node) {
         int bottomLevel = 0;
-        Node[] preds = new Node[MAX_LEVEL + 1];
-        Node[] succs = new Node[MAX_LEVEL + 1];
+        Node[] preds = this.preds.get();
+        Node[] succs = this.succs.get();
         Node succ;
         while (true) {
             boolean found = find(node, preds, succs);

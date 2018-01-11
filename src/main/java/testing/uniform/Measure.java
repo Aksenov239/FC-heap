@@ -2,6 +2,8 @@ package testing.uniform;
 
 import abstractions.Heap;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Random;
 
 /**
@@ -20,6 +22,11 @@ public class Measure {
 
     Heap heap;
 
+    public static void log(String x) {
+        String time = (new SimpleDateFormat("YYYY.MM.dd-HH:mm:ss.sss")).format(new Date());
+        System.err.println(time + ": " + x);
+    }
+
     public void prepopulate() {
         Random rnd = new Random(239);
         for (int i = 0; i < size; i++) {
@@ -29,7 +36,7 @@ public class Measure {
 
     public void evaluateFor(int milliseconds, boolean withStats) {
         prepopulate();
-        System.err.println("Prepopulation is finished");
+        log("Prepopulation is finished");
 
         Thread[] thrs = new Thread[threads];
         HeapWorker[] workers = new HeapWorker[threads];
@@ -37,7 +44,7 @@ public class Measure {
             workers[i] = new HeapWorker(i, heap, range, insertRatio);
             thrs[i] = new Thread(workers[i]);
         }
-        System.err.println("Created " + threads);
+        log("Created " + threads);
 
         long start = System.nanoTime();
 
@@ -55,7 +62,7 @@ public class Measure {
         for (int i = 0; i < threads; i++) {
             workers[i].stop();
         }
-//        System.err.println("Workers are stopped " + (System.nanoTime() - start) / 1_000_000_000);
+        log("Workers are stopped " + (System.nanoTime() - start) / 1_000_000_000);
 
         for (int i = 0; i < threads; i++) {
             try {
