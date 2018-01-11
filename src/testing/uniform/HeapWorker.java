@@ -16,18 +16,20 @@ public class HeapWorker implements Runnable {
     Random rnd;
     Heap heap;
     int range;
-    int insertRation;
+    int insertRatio;
+    int id;
 
-    public HeapWorker(int id, Heap heap, int range, int insertRation) {
+    public HeapWorker(int id, Heap heap, int range, int insertRatio) {
+        this.id = id;
         rnd = new Random(id);
         this.heap = heap;
         this.range = range;
-        this.insertRation = insertRation;
+        this.insertRatio = insertRatio;
     }
 
     public void run() {
         while (!stop) {
-            if (rnd.nextInt(100) < insertRation) {
+            if (rnd.nextInt(100) < insertRatio) {
                 heap.insert(rnd.nextInt(range));
                 numInserts++;
             } else {
@@ -35,6 +37,7 @@ public class HeapWorker implements Runnable {
                 numDeletes++;
             }
         }
+        System.err.println("Finished " + id);
     }
 
     public void stop() {

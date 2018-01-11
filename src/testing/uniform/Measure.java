@@ -37,6 +37,7 @@ public class Measure {
             workers[i] = new HeapWorker(i, heap, range, insertRatio);
             thrs[i] = new Thread(workers[i]);
         }
+        System.err.println("Created " + threads);
 
         long start = System.nanoTime();
 
@@ -50,9 +51,11 @@ public class Measure {
             e.printStackTrace();
         }
 
+//        System.err.println("Workers are going to be stopped " + (System.nanoTime() - start) / 1_000_000_000);
         for (int i = 0; i < threads; i++) {
             workers[i].stop();
         }
+//        System.err.println("Workers are stopped " + (System.nanoTime() - start) / 1_000_000_000);
 
         for (int i = 0; i < threads; i++) {
             try {
