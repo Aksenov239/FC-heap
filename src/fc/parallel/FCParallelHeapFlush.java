@@ -430,6 +430,7 @@ public class FCParallelHeapFlush implements Heap {
             int tmp = heap[current].v;
             heap[current].v = heap[swap].v;
             heap[swap].v = tmp;
+            unsafe.storeFence();
 
             heap[current].underProcessing = false;
             current = swap;
@@ -491,6 +492,8 @@ public class FCParallelHeapFlush implements Heap {
 //                    throw new RuntimeException("Fuck");
 //                }
                 heap[(current << 1) + 1].insertInfo = toRight; // Give info to the right child
+                unsafe.storeFence();
+
                 heap[current].underProcessing = false;
                 unsafe.storeFence();
 
@@ -519,6 +522,8 @@ public class FCParallelHeapFlush implements Heap {
         }
 //        assert insertInfo.lneed <= current && current < insertInfo.rneed;
         heap[current].v = insertInfo.replaceMinFromHeap(Integer.MAX_VALUE); // The last insert position
+        unsafe.storeFence();
+
         request.status = FINISHED;
         unsafe.storeFence();
     }
