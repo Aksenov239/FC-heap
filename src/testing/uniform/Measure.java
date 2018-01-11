@@ -29,6 +29,7 @@ public class Measure {
 
     public void evaluateFor(int milliseconds, boolean withStats) {
         prepopulate();
+        System.err.println("Prepopulation is finished");
 
         Thread[] thrs = new Thread[threads];
         HeapWorker[] workers = new HeapWorker[threads];
