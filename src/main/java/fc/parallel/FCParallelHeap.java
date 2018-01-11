@@ -3,7 +3,7 @@ package fc.parallel;
 import abstractions.Heap;
 import fc.FC;
 import fc.FCRequest;
-import org.openjdk.jmh.logic.BlackHole;
+import org.openjdk.jmh.infra.Blackhole;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -387,7 +387,7 @@ public class FCParallelHeap implements Heap {
 //        } catch (InterruptedException e) {
 //            e.printStackTrace();
 //        }
-        BlackHole.consumeCPU(10);
+        Blackhole.consumeCPU(10);
     }
 
     public void handleRequest(Request request) {

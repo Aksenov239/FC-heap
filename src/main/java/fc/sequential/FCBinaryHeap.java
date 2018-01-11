@@ -4,7 +4,7 @@ import abstractions.Heap;
 import fc.FC;
 import fc.FCArray;
 import fc.FCRequest;
-import org.openjdk.jmh.logic.BlackHole;
+import org.openjdk.jmh.infra.Blackhole;
 
 import java.util.Arrays;
 import java.util.PriorityQueue;
@@ -128,7 +128,7 @@ public class FCBinaryHeap implements Heap {
     private ReentrantLock lock = new ReentrantLock();
 
     public void sleep() {
-        BlackHole.consumeCPU(300);
+        Blackhole.consumeCPU(300);
     }
 
     public void handleRequest(Request request) {

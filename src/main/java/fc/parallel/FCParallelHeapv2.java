@@ -2,7 +2,7 @@ package fc.parallel;
 
 import abstractions.Heap;
 import fc.FCArray;
-import org.openjdk.jmh.logic.BlackHole;
+import org.openjdk.jmh.infra.Blackhole;
 
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -408,7 +408,7 @@ public class FCParallelHeapv2 implements Heap {
     FCArray.FCRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(300);
+        Blackhole.consumeCPU(300);
     }
 
     public class InnerHeap {

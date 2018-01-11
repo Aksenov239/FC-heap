@@ -2,7 +2,7 @@ package clh;
 
 import abstractions.Heap;
 import clh.FCCLH;
-import org.openjdk.jmh.logic.BlackHole;
+import org.openjdk.jmh.infra.Blackhole;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Constructor;
@@ -497,7 +497,7 @@ public class CLHParallelHeapFlush implements Heap {
     FCCLH.CLHRequest[] loadedRequests;
 
     public void sleep() {
-        BlackHole.consumeCPU(300);
+        Blackhole.consumeCPU(300);
     }
 
     public class InnerHeap {

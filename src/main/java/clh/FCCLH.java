@@ -1,6 +1,6 @@
 package clh;
 
-import org.openjdk.jmh.logic.BlackHole;
+import org.openjdk.jmh.infra.Blackhole;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Constructor;
@@ -64,7 +64,7 @@ public class FCCLH {
         assert request.current.backward == request;
 
         while (now.locked == 1) {
-            BlackHole.consumeCPU(20);
+            Blackhole.consumeCPU(20);
         }
 
         return now.locked == 0; // 0 if combiner, 2 if not
@@ -82,7 +82,7 @@ public class FCCLH {
                 throw new AssertionError();
             }
             while (requests[j].prev == null) {
-                BlackHole.consumeCPU(20);
+                Blackhole.consumeCPU(20);
             }
             last = requests[j].prev;
             j++;
